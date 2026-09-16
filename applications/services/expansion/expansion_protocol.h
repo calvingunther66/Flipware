@@ -48,6 +48,14 @@ typedef enum {
     ExpansionFrameTypeBaudRate = 3, /**< Baud rate negotiation frame. */
     ExpansionFrameTypeControl = 4, /**< Control frame. */
     ExpansionFrameTypeData = 5, /**< Data frame. */
+    /** @brief Coprocessor job frame.
+     *
+     * Carries chunked compute-offload job requests and results. Independent of,
+     * and may be freely interleaved with, an active RPC session (@see
+     * ExpansionFrameControlCommandStartRpc) — the two are sibling channels over
+     * the same link, not exclusive modes. Valid any time after the handshake.
+     */
+    ExpansionFrameTypeCoproc = 6,
     ExpansionFrameTypeReserved, /**< Special value. */
 } ExpansionFrameType;
 
@@ -87,6 +95,28 @@ typedef enum {
       */
     ExpansionFrameControlCommandDisableOtg = 0x03,
 } ExpansionFrameControlCommand;
+
+/**
+ * @brief Coprocessor job frame flag bits.
+ */
+typedef enum {
+    /** @brief Set on a job request chunk (Flipper -> module), clear on a result chunk (module -> Flipper). */
+    ExpansionFrameCoprocFlagRequest = (1 << 0),
+    /** @brief Set on the first chunk of a job message. */
+    ExpansionFrameCoprocFlagFirst = (1 << 1),
+    /** @brief Set on the last chunk of a job message. */
+    ExpansionFrameCoprocFlagLast = (1 << 2),
+    /** @brief Set on a result chunk to indicate the job failed; payload (if any) is undefined. */
+    ExpansionFrameCoprocFlagError = (1 << 3),
+} ExpansionFrameCoprocFlag;
+
+/**
+ * @brief Maximum coprocessor job payload size per frame, in bytes.
+ *
+ * Smaller than EXPANSION_PROTOCOL_MAX_DATA_SIZE to make room for the
+ * chunk header fields within the same frame content size ceiling.
+ */
+#define EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE (56U)
 
 #pragma pack(push, 1)
 
@@ -136,6 +166,26 @@ typedef struct {
 } ExpansionFrameData;
 
 /**
+ * @brief Coprocessor job frame contents.
+ *
+ * Job requests and results are chunked across one or more of these frames,
+ * reassembled by (job_id, request-vs-result) on the receiving side using the
+ * First/Last flags. A job_id is only reused after its result has been fully
+ * delivered.
+ */
+typedef struct {
+    uint16_t job_id; /**< Sender-assigned identifier, unique among that sender's in-flight jobs. */
+    uint8_t task_type; /**< Task type identifier. Meaning is defined above the protocol layer. */
+    uint8_t flags; /**< @see ExpansionFrameCoprocFlag. */
+    uint16_t chunk_seq; /**< Zero-based index of this chunk within the message. */
+    uint16_t chunk_total; /**< Total number of chunks in this message. */
+    /** Size of this chunk's payload. Must be less than EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE. */
+    uint8_t payload_len;
+    /** Payload bytes. Valid only up to ExpansionFrameCoproc::payload_len bytes. */
+    uint8_t payload[EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE];
+} ExpansionFrameCoproc;
+
+/**
  * @brief Expansion protocol frame structure.
  */
 typedef struct {
@@ -146,6 +196,7 @@ typedef struct {
         ExpansionFrameBaudRate baud_rate; /**< Baud rate frame contents. */
         ExpansionFrameControl control; /**< Control frame contents. */
         ExpansionFrameData data; /**< Data frame contents. */
+        ExpansionFrameCoproc coproc; /**< Coprocessor job frame contents. */
     } content; /**< Contents of the frame. */
 } ExpansionFrame;
 
@@ -200,6 +251,9 @@ static inline size_t expansion_frame_get_encoded_size(const ExpansionFrame* fram
         return sizeof(frame->header) + sizeof(frame->content.control);
     case ExpansionFrameTypeData:
         return sizeof(frame->header) + sizeof(frame->content.data.size) + frame->content.data.size;
+    case ExpansionFrameTypeCoproc:
+        return sizeof(frame->header) + offsetof(ExpansionFrameCoproc, payload) +
+               frame->content.coproc.payload_len;
     default:
         return 0;
     }
@@ -251,6 +305,17 @@ static inline bool expansion_frame_get_remaining_size(
             return false;
         } else {
             content_size = sizeof(frame->content.data.size) + frame->content.data.size;
+        }
+        break;
+    case ExpansionFrameTypeCoproc:
+        if(received_content_size < offsetof(ExpansionFrameCoproc, payload)) {
+            // Chunk header is not fully known yet
+            content_size = offsetof(ExpansionFrameCoproc, payload);
+        } else if(frame->content.coproc.payload_len > sizeof(frame->content.coproc.payload)) {
+            // Malformed frame or garbage input
+            return false;
+        } else {
+            content_size = offsetof(ExpansionFrameCoproc, payload) + frame->content.coproc.payload_len;
         }
         break;
     default:

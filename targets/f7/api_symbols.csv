@@ -7,6 +7,7 @@ Header,+,applications/services/bt/bt_service/bt.h,,
 Header,+,applications/services/bt/bt_service/bt_keys_storage.h,,
 Header,+,applications/services/cli/cli.h,,
 Header,+,applications/services/cli/cli_vcp.h,,
+Header,+,applications/services/coproc/coproc.h,,
 Header,+,applications/services/dialogs/dialogs.h,,
 Header,+,applications/services/dolphin/dolphin.h,,
 Header,+,applications/services/expansion/expansion.h,,
@@ -938,6 +939,10 @@ Function,+,compress_stream_decoder_read,_Bool,"CompressStreamDecoder*, uint8_t*,
 Function,+,compress_stream_decoder_rewind,_Bool,CompressStreamDecoder*
 Function,+,compress_stream_decoder_seek,_Bool,"CompressStreamDecoder*, size_t"
 Function,+,compress_stream_decoder_tell,size_t,CompressStreamDecoder*
+Function,+,coproc_is_available,_Bool,Coproc*
+Function,+,coproc_register_fallback,void,"Coproc*, CoprocTaskType, CoprocFallbackFn, void*"
+Function,+,coproc_run,_Bool,"Coproc*, CoprocTaskType, const uint8_t*, size_t, uint8_t*, size_t*, uint32_t, _Bool*"
+Function,+,coproc_supports,_Bool,"Coproc*, CoprocTaskType"
 Function,-,copysign,double,"double, double"
 Function,-,copysignf,float,"float, float"
 Function,-,copysignl,long double,"long double, long double"
@@ -1103,9 +1108,11 @@ Function,-,exp10f,float,float
 Function,-,exp2,double,double
 Function,-,exp2f,float,float
 Function,-,exp2l,long double,long double
+Function,+,expansion_coproc_send,_Bool,"Expansion*, uint16_t, uint8_t, const uint8_t*, size_t"
 Function,+,expansion_disable,void,Expansion*
 Function,+,expansion_enable,void,Expansion*
 Function,+,expansion_is_connected,_Bool,Expansion*
+Function,+,expansion_set_coproc_callback,void,"Expansion*, ExpansionCoprocCallback, void*"
 Function,+,expansion_set_listen_serial,void,"Expansion*, FuriHalSerialId"
 Function,-,expf,float,float
 Function,-,expl,long double,long double

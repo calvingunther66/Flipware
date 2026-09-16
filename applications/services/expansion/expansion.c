@@ -30,11 +30,30 @@ typedef enum {
     ExpansionMessageTypeModuleDisconnected,
     ExpansionMessageTypeConnectionEstablished,
     ExpansionMessageTypeIsConnected,
+    ExpansionMessageTypeSetCoprocCallback,
+    ExpansionMessageTypeCoprocSend,
 } ExpansionMessageType;
+
+typedef struct {
+    ExpansionCoprocCallback callback;
+    void* context;
+} ExpansionMessageCoprocCallback;
+
+// Points to a struct on the calling thread's stack; the handler fills in
+// ::success before the api_lock is released, mirroring is_connected above.
+typedef struct {
+    uint16_t job_id;
+    uint8_t task_type;
+    const uint8_t* data;
+    size_t data_size;
+    bool success;
+} ExpansionMessageCoprocSend;
 
 typedef union {
     FuriHalSerialId serial_id;
     bool* is_connected;
+    ExpansionMessageCoprocCallback coproc_callback;
+    ExpansionMessageCoprocSend* coproc_send;
 } ExpansionMessageData;
 
 typedef struct {
@@ -49,6 +68,9 @@ struct Expansion {
     FuriHalSerialId serial_id;
     ExpansionWorker* worker;
     ExpansionState state;
+
+    ExpansionCoprocCallback coproc_callback;
+    void* coproc_cb_context;
 };
 
 static const char* const expansion_uart_names[] = {
@@ -191,6 +213,10 @@ static void expansion_control_handler_module_connected(
     instance->worker = expansion_worker_alloc(instance->serial_id);
 
     expansion_worker_set_callback(instance->worker, expansion_worker_callback, instance);
+    if(instance->coproc_callback) {
+        expansion_worker_set_coproc_callback(
+            instance->worker, instance->coproc_callback, instance->coproc_cb_context);
+    }
     expansion_worker_start(instance->worker);
 }
 
@@ -226,6 +252,32 @@ static void
     *data->is_connected = instance->state == ExpansionStateConnectionEstablished;
 }
 
+static void expansion_control_handler_set_coproc_callback(
+    Expansion* instance,
+    const ExpansionMessageData* data) {
+    instance->coproc_callback = data->coproc_callback.callback;
+    instance->coproc_cb_context = data->coproc_callback.context;
+
+    if(instance->state == ExpansionStateRunning ||
+       instance->state == ExpansionStateConnectionEstablished) {
+        expansion_worker_set_coproc_callback(
+            instance->worker, instance->coproc_callback, instance->coproc_cb_context);
+    }
+}
+
+static void
+    expansion_control_handler_coproc_send(Expansion* instance, const ExpansionMessageData* data) {
+    ExpansionMessageCoprocSend* req = data->coproc_send;
+
+    if(instance->state != ExpansionStateConnectionEstablished) {
+        req->success = false;
+        return;
+    }
+
+    req->success = expansion_worker_coproc_send(
+        instance->worker, req->job_id, req->task_type, req->data, req->data_size);
+}
+
 typedef void (*ExpansionControlHandler)(Expansion*, const ExpansionMessageData*);
 
 static const ExpansionControlHandler expansion_control_handlers[] = {
@@ -237,6 +289,8 @@ static const ExpansionControlHandler expansion_control_handlers[] = {
     [ExpansionMessageTypeModuleDisconnected] = expansion_control_handler_module_disconnected,
     [ExpansionMessageTypeConnectionEstablished] = expansion_control_handler_connection_established,
     [ExpansionMessageTypeIsConnected] = expansion_control_handler_is_connected,
+    [ExpansionMessageTypeSetCoprocCallback] = expansion_control_handler_set_coproc_callback,
+    [ExpansionMessageTypeCoprocSend] = expansion_control_handler_coproc_send,
 };
 
 static int32_t expansion_control(void* context) {
@@ -267,6 +321,8 @@ static Expansion* expansion_alloc(void) {
         furi_message_queue_alloc(EXPANSION_CONTROL_QUEUE_SIZE, sizeof(ExpansionMessage));
     instance->thread =
         furi_thread_alloc_ex(TAG, EXPANSION_CONTROL_STACK_SIZE, expansion_control, instance);
+    instance->coproc_callback = NULL;
+    instance->coproc_cb_context = NULL;
 
     return instance;
 }
@@ -359,4 +415,50 @@ void expansion_set_listen_serial(Expansion* instance, FuriHalSerialId serial_id)
 
     furi_message_queue_put(instance->queue, &message, FuriWaitForever);
     api_lock_wait_unlock_and_free(message.api_lock);
+}
+
+void expansion_set_coproc_callback(
+    Expansion* instance,
+    ExpansionCoprocCallback callback,
+    void* context) {
+    furi_check(instance);
+
+    ExpansionMessage message = {
+        .type = ExpansionMessageTypeSetCoprocCallback,
+        .data.coproc_callback = {.callback = callback, .context = context},
+        .api_lock = api_lock_alloc_locked(),
+    };
+
+    furi_message_queue_put(instance->queue, &message, FuriWaitForever);
+    api_lock_wait_unlock_and_free(message.api_lock);
+}
+
+bool expansion_coproc_send(
+    Expansion* instance,
+    uint16_t job_id,
+    uint8_t task_type,
+    const uint8_t* data,
+    size_t data_size) {
+    furi_check(instance);
+
+    ExpansionMessageCoprocSend req = {
+        .job_id = job_id,
+        .task_type = task_type,
+        .data = data,
+        .data_size = data_size,
+        .success = false,
+    };
+
+    ExpansionMessage message = {
+        .type = ExpansionMessageTypeCoprocSend,
+        .data.coproc_send = &req,
+        .api_lock = api_lock_alloc_locked(),
+    };
+
+    // Blocks the shared control thread for the duration of the (chunked)
+    // transfer - see expansion_coproc_send() doc comment in expansion.h.
+    furi_message_queue_put(instance->queue, &message, FuriWaitForever);
+    api_lock_wait_unlock_and_free(message.api_lock);
+
+    return req.success;
 }
