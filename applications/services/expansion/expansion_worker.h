@@ -11,6 +11,11 @@
 #pragma once
 
 #include <furi_hal_serial_types.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+
+#include "expansion.h"
 
 /**
  * @brief Expansion worker opaque type declaration.
@@ -31,6 +36,10 @@ typedef enum {
  * @param[in] reason reason for the callback.
  */
 typedef void (*ExpansionWorkerCallback)(void* context, ExpansionWorkerCallbackReason reason);
+
+// Coprocessor inbound-message callback: @see ExpansionCoprocCallback in expansion.h
+// (the type is defined there since it's part of the public API surface too;
+// fires on the worker's own thread here, only while a module is connected).
 
 /**
  * @brief Create an expansion worker instance.
@@ -82,3 +91,42 @@ void expansion_worker_start(ExpansionWorker* instance);
  * @param[in,out] instance pointer to the worker instance to be stopped.
  */
 void expansion_worker_stop(ExpansionWorker* instance);
+
+/**
+ * @brief Set the coprocessor inbound-message callback.
+ *
+ * Must be called before expansion_worker_start(). The Coproc channel is
+ * accepted independently of RPC session state (i.e. in both the Connected
+ * and RpcActive worker states) once the handshake has completed.
+ *
+ * @param[in,out] instance pointer to the worker instance to be modified.
+ * @param[in] callback pointer to the callback function.
+ * @param[in] context pointer to a user-defined object, passed to the callback.
+ */
+void expansion_worker_set_coproc_callback(
+    ExpansionWorker* instance,
+    ExpansionCoprocCallback callback,
+    void* context);
+
+/**
+ * @brief Send a coprocessor job request to the connected module.
+ *
+ * Blocks the calling thread while chunking and transmitting the request,
+ * waiting for a per-chunk Status acknowledgement from the module (same
+ * flow-control discipline as the RPC send path). Safe to call from any
+ * thread; only one coprocessor send may be in flight at a time per worker.
+ *
+ * @param[in,out] instance pointer to the worker instance.
+ * @param[in] job_id identifier for this job; the matching result delivered to
+ *            the coproc callback will carry the same value.
+ * @param[in] task_type task type identifier, meaningful to both firmwares above this layer.
+ * @param[in] data pointer to the job input payload.
+ * @param[in] data_size size of the job input payload, in bytes.
+ * @returns true if the request was fully transmitted and acknowledged, false on any I/O error.
+ */
+bool expansion_worker_coproc_send(
+    ExpansionWorker* instance,
+    uint16_t job_id,
+    uint8_t task_type,
+    const uint8_t* data,
+    size_t data_size);

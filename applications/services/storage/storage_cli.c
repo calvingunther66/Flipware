@@ -12,6 +12,7 @@
 #include <storage/storage.h>
 #include <storage/storage_sd_api.h>
 #include <power/power_service/power.h>
+#include <coproc/coproc.h>
 #include <toolbox/pipe.h>
 
 #define MAX_NAME_LENGTH 254
@@ -515,6 +516,78 @@ static void storage_cli_md5(PipeSide* pipe, FuriString* path, FuriString* args) 
     furi_record_close(RECORD_STORAGE);
 }
 
+// Demonstrates the expansion-module compute-offload pipeline end to end:
+// reads the whole file into memory and computes its CRC32 via coproc_run(),
+// which offloads to a connected module's Coproc channel if one is present,
+// falling back to the same crc32_calc_buffer() this command would otherwise
+// call directly. This is a pipeline correctness demo, not a speed feature -
+// see the warning in coproc.h for why offloading CRC32 over this link is
+// expected to be *slower* than computing it locally.
+#define STORAGE_CLI_CRC32_MAX_FILE_SIZE (64UL * 1024UL)
+
+static void storage_cli_crc32(PipeSide* pipe, FuriString* path, FuriString* args) {
+    UNUSED(pipe);
+    UNUSED(args);
+
+    Storage* api = furi_record_open(RECORD_STORAGE);
+    File* file = storage_file_alloc(api);
+    uint8_t* buffer = NULL;
+
+    do {
+        if(!storage_file_open(file, furi_string_get_cstr(path), FSAM_READ, FSOM_OPEN_EXISTING)) {
+            storage_cli_print_error(storage_file_get_error(file));
+            break;
+        }
+
+        const uint64_t file_size = storage_file_size(file);
+        if(file_size > STORAGE_CLI_CRC32_MAX_FILE_SIZE) {
+            printf(
+                "File too large for this demo command (max %lu bytes)\r\n",
+                STORAGE_CLI_CRC32_MAX_FILE_SIZE);
+            break;
+        }
+
+        buffer = malloc((size_t)file_size);
+        if(storage_file_read(file, buffer, (size_t)file_size) != (size_t)file_size) {
+            storage_cli_print_error(storage_file_get_error(file));
+            break;
+        }
+
+        Coproc* coproc = furi_record_open(RECORD_COPROC);
+
+        uint32_t crc = 0;
+        size_t crc_size = sizeof(crc);
+        bool offloaded = false;
+        const uint32_t start_tick = furi_get_tick();
+        const bool success = coproc_run(
+            coproc,
+            CoprocTaskCrc32,
+            buffer,
+            (size_t)file_size,
+            (uint8_t*)&crc,
+            &crc_size,
+            1000,
+            &offloaded);
+        const uint32_t end_tick = furi_get_tick();
+        furi_record_close(RECORD_COPROC);
+
+        if(success) {
+            printf(
+                "%08lx (%s, %lu ticks)\r\n",
+                crc,
+                offloaded ? "offloaded" : "local",
+                end_tick - start_tick);
+        } else {
+            printf("CRC32 computation failed\r\n");
+        }
+    } while(false);
+
+    free(buffer);
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+}
+
 static bool tar_extract_file_callback(const char* name, bool is_directory, void* context) {
     UNUSED(context);
     printf("\t%s %s\r\n", is_directory ? "D" : "F", name);
@@ -584,6 +657,11 @@ static const StorageCliCommand storage_cli_commands[] = {
         "md5",
         "md5 hash of the file",
         &storage_cli_md5,
+    },
+    {
+        "crc32",
+        "crc32 of the file, offloaded to a connected expansion module if available",
+        &storage_cli_crc32,
     },
     {
         "stat",
