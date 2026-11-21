@@ -22,7 +22,19 @@
 // 768, immediately followed by the worker repeatedly restarting. Bumped
 // with real headroom rather than the minimum that clears the warning.
 #define EXPANSION_WORKER_STACK_SZIE  (2048UL)
-#define EXPANSION_WORKER_BUFFER_SIZE (sizeof(ExpansionFrame) + sizeof(ExpansionFrameChecksum))
+// RX staging buffer between the UART DMA callback (IRQ) and the worker
+// thread. It used to hold exactly one encoded frame, so any burst bigger than
+// one frame (e.g. a STATUS ack immediately followed by the next DATA/COPROC
+// frame) was silently dropped by the zero-timeout send from IRQ context. Sized
+// to several frames so the worker can lag a little at high baud rates, which
+// is also a prerequisite for ever pipelining coproc chunks.
+#define EXPANSION_WORKER_BUFFER_SIZE \
+    (8UL * (sizeof(ExpansionFrame) + sizeof(ExpansionFrameChecksum)))
+// Bytes copied out of the HAL DMA ring per step inside the IRQ callback. Kept
+// small because it lives on the interrupt stack.
+#define EXPANSION_WORKER_DMA_CHUNK_SIZE (32UL)
+// Granularity at which a blocked coproc sender notices the worker has exited.
+#define EXPANSION_WORKER_COPROC_WAIT_SLICE_MS (50UL)
 
 /**
  * @brief Maximum reassembled size of a single coprocessor job message.
@@ -113,6 +125,8 @@ struct ExpansionWorker {
     // coproc_tx_chunk_next + 1 instead of retrying. coproc_run()'s own
     // timeout is the backstop if RPC traffic never leaves a gap.
     ExpansionCoprocTxRequest* coproc_tx_active;
+    // Set by the worker thread once it stops servicing coproc sends.
+    volatile bool coproc_tx_closed;
     uint16_t coproc_tx_chunk_next;
     uint16_t coproc_tx_chunk_total;
     bool coproc_tx_chunk_sent;
@@ -144,10 +158,15 @@ struct ExpansionWorker {
     volatile FuriHalSerialRxEvent last_rx_error_event;
 };
 
-// Called in UART IRQ context
-static void expansion_worker_serial_rx_callback(
+// Called in IRQ context (USART IDLE/error interrupt or DMA half/full-transfer
+// interrupt). RX runs through the HAL's circular DMA ring rather than one
+// interrupt per byte: at 1.8 Mbaud the per-byte path fired ~180k IRQs/s, each
+// doing a FreeRTOS stream-buffer send, and any IRQ latency longer than the
+// 8-byte hardware FIFO (~43 us at 1.8 Mbaud) overran the USART.
+static void expansion_worker_serial_rx_dma_callback(
     FuriHalSerialHandle* handle,
     FuriHalSerialRxEvent event,
+    size_t size,
     void* context) {
     furi_assert(handle);
     furi_assert(context);
@@ -158,12 +177,29 @@ static void expansion_worker_serial_rx_callback(
                 FuriHalSerialRxEventOverrunError)) {
         instance->last_rx_error_event = event;
         furi_thread_flags_set(furi_thread_get_id(instance->thread), ExpansionWorkerFlagError);
-    } else if(event & FuriHalSerialRxEventData) {
-        while(furi_hal_serial_async_rx_available(handle)) {
-            const uint8_t data = furi_hal_serial_async_rx(handle);
-            furi_stream_buffer_send(instance->rx_buf, &data, sizeof(data), 0);
+    } else if(event & (FuriHalSerialRxEventData | FuriHalSerialRxEventIdle)) {
+        uint8_t chunk[EXPANSION_WORKER_DMA_CHUNK_SIZE];
+        bool pushed = false;
+        bool dropped = false;
+
+        while(size) {
+            const size_t got = furi_hal_serial_dma_rx(
+                handle, chunk, size > sizeof(chunk) ? sizeof(chunk) : size);
+            if(got == 0) break;
+            size -= got;
+            const size_t sent = furi_stream_buffer_send(instance->rx_buf, chunk, got, 0);
+            if(sent) pushed = true;
+            if(sent != got) dropped = true;
         }
-        furi_thread_flags_set(furi_thread_get_id(instance->thread), ExpansionWorkerFlagData);
+
+        if(dropped) {
+            // Losing bytes desynchronises framing; reset the link explicitly
+            // instead of letting a corrupted frame surface later as a
+            // checksum error or a timeout.
+            furi_thread_flags_set(furi_thread_get_id(instance->thread), ExpansionWorkerFlagError);
+        } else if(pushed) {
+            furi_thread_flags_set(furi_thread_get_id(instance->thread), ExpansionWorkerFlagData);
+        }
     }
 }
 
@@ -286,9 +322,14 @@ static size_t expansion_worker_receive_callback(uint8_t* data, size_t data_size,
             instance->exit_reason = ExpansionWorkerExitReasonUser;
             break;
         } else if(flags & ExpansionWorkerFlagError) {
-            // Exiting due to a UART RX error (noise/framing/overrun) - see
-            // expansion_worker_serial_rx_callback().
-            FURI_LOG_E(TAG, "UART RX error, event=0x%08x", instance->last_rx_error_event);
+            // Exiting due to a UART RX error (noise/framing/overrun) or a
+            // staging-buffer overflow - see
+            // expansion_worker_serial_rx_dma_callback().
+            if(instance->last_rx_error_event) {
+                FURI_LOG_E(TAG, "UART RX error, event=0x%08x", instance->last_rx_error_event);
+            } else {
+                FURI_LOG_E(TAG, "UART RX staging buffer overflow, bytes dropped");
+            }
             instance->exit_reason = ExpansionWorkerExitReasonError;
             break;
         } else if(flags & ExpansionWorkerFlagData) {
@@ -649,14 +690,35 @@ static int32_t expansion_worker(void* context) {
 
     furi_hal_serial_init(instance->serial_handle, EXPANSION_PROTOCOL_DEFAULT_BAUD_RATE);
 
-    furi_hal_serial_async_rx_start(
-        instance->serial_handle, expansion_worker_serial_rx_callback, instance, true);
+    furi_hal_serial_dma_rx_start(
+        instance->serial_handle, expansion_worker_serial_rx_dma_callback, instance, true);
 
     if(expansion_worker_send_heartbeat(instance)) {
         expansion_worker_state_machine(instance);
     }
 
-    furi_hal_serial_async_rx_stop(instance->serial_handle);
+    furi_hal_serial_dma_rx_stop(instance->serial_handle);
+
+    // Release any coproc sender still blocked in expansion_worker_coproc_send():
+    // the link is gone, so its chunks will never be acked. Without this the
+    // caller sat out its whole per-chunk budget (250 ms x (chunks + 2), ~19 s
+    // for a 4 KiB job) before falling back to local compute.
+    //
+    // Order matters: `req` lives on the sender's stack and the sender frees
+    // its semaphore as soon as it sees coproc_tx_closed, so the flag must be
+    // raised only AFTER every request already handed to us has been released.
+    // A sender that then sees the flag either was already released (its
+    // zero-timeout acquire succeeds) or queued after the drain, in which case
+    // we never touch its request.
+    if(instance->coproc_tx_active) {
+        expansion_worker_finish_coproc_tx(instance, false);
+    }
+    ExpansionCoprocTxRequest* stale_req = NULL;
+    while(furi_message_queue_get(instance->coproc_tx_queue, &stale_req, 0) == FuriStatusOk) {
+        stale_req->success = false;
+        furi_semaphore_release(stale_req->done);
+    }
+    instance->coproc_tx_closed = true;
 
     if(instance->state == ExpansionWorkerStateRpcActive) {
         expansion_worker_rpc_session_close(instance);
@@ -690,6 +752,7 @@ ExpansionWorker* expansion_worker_alloc(FuriHalSerialId serial_id) {
     instance->coproc_tx_queue = furi_message_queue_alloc(1, sizeof(ExpansionCoprocTxRequest*));
     instance->tx_semaphore = NULL;
     instance->coproc_tx_active = NULL;
+    instance->coproc_tx_closed = false;
     instance->coproc_tx_chunk_next = 0;
     instance->coproc_tx_chunk_total = 0;
     instance->coproc_tx_chunk_sent = false;
@@ -831,7 +894,15 @@ bool expansion_worker_coproc_send(
                                                        EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE - 1) /
                                                       EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE);
         const uint32_t wait_ms = EXPANSION_PROTOCOL_TIMEOUT_MS * (chunk_total + 2);
-        const FuriStatus done_status = furi_semaphore_acquire(req.done, furi_ms_to_ticks(wait_ms));
+        // Wait in slices so a worker that exits after we queued (link lost)
+        // ends the wait at once instead of after the whole budget.
+        FuriStatus done_status = FuriStatusErrorTimeout;
+        for(uint32_t waited = 0; waited < wait_ms; waited += EXPANSION_WORKER_COPROC_WAIT_SLICE_MS) {
+            done_status =
+                furi_semaphore_acquire(req.done, furi_ms_to_ticks(EXPANSION_WORKER_COPROC_WAIT_SLICE_MS));
+            if(done_status == FuriStatusOk || instance->coproc_tx_closed) break;
+        }
+        if(done_status != FuriStatusOk) done_status = furi_semaphore_acquire(req.done, 0);
         if(done_status == FuriStatusOk) {
             success = req.success;
         }

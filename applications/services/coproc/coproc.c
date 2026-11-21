@@ -178,6 +178,7 @@ bool coproc_run(
     bool offloaded = false;
     bool delivered = false;
     FuriApiLock lock = NULL;
+    const uint32_t start_tick = furi_get_tick();
 
     if(expansion_is_connected(instance->expansion)) {
         // job_mutex-serialized, so a plain increment is safe; skip 0, which
@@ -233,6 +234,19 @@ bool coproc_run(
         // reference it from coproc_expansion_callback(); freeing here would
         // race a concurrent api_lock_unlock() on freed memory. Acceptable
         // for occasional jobs; see the struct comment in coproc_i.h.
+    }
+
+    if(lock) {
+        // Round-trip timing for the link (send, module compute, result
+        // back). Debug level so it costs nothing unless the log level is
+        // raised; use it to compare baud rates / RX paths on hardware.
+        FURI_LOG_D(
+            TAG,
+            "task %u: %zu B in, %s after %lu ms",
+            (unsigned)task,
+            input_size,
+            offloaded ? "offloaded" : (delivered ? "module failed" : "timed out"),
+            (unsigned long)(furi_get_tick() - start_tick)); // 1 tick = 1 ms
     }
 
     if(offloaded) {
