@@ -4,6 +4,9 @@
 #include <toolbox/path.h>
 
 #include "sd_notify.h"
+#ifdef SRV_EXPANSION
+#include <expansion/expansion_module_present.h>
+#endif
 #include "storage_ext.h"
 
 #include "../filesystem_api_internal.h"
@@ -41,7 +44,18 @@ static bool sd_mount_card_internal(StorageData* storage, bool notify) {
             furi_record_close(RECORD_NOTIFICATION);
         }
 
-        if((counter % 2) == 0) {
+        // A power reset cuts ext3.3V, which also feeds header pin 9, so a
+        // module running from pin 9 (VGM, devboard) would brown out. While
+        // one is attached, only power-cycle the card as a last resort.
+        bool power_reset = (counter % 2) == 0;
+#ifdef SRV_EXPANSION
+        if(power_reset && counter > 2 && expansion_is_module_present()) {
+            FURI_LOG_I(TAG, "Expansion module attached, skipping SD power reset");
+            power_reset = false;
+        }
+#endif
+
+        if(power_reset) {
             // power reset sd card
             bsp_result = furi_hal_sd_init(true);
         } else {

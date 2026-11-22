@@ -8,11 +8,19 @@
 
 #include "expansion_worker.h"
 #include "expansion_settings.h"
+#include "expansion_module_present.h"
 
 #define TAG "ExpansionSrv"
 
 #define EXPANSION_CONTROL_QUEUE_SIZE (8UL)
 #define EXPANSION_CONTROL_STACK_SIZE (768UL)
+
+// Written only by the control thread, read from anywhere.
+static volatile bool expansion_module_present = false;
+
+bool expansion_is_module_present(void) {
+    return expansion_module_present;
+}
 
 typedef enum {
     ExpansionStateDisabled,
@@ -305,6 +313,8 @@ static int32_t expansion_control(void* context) {
 
         furi_check(message.type < COUNT_OF(expansion_control_handlers));
         expansion_control_handlers[message.type](instance, &message.data);
+        expansion_module_present = instance->state == ExpansionStateRunning ||
+                                   instance->state == ExpansionStateConnectionEstablished;
 
         if(message.api_lock != NULL) {
             api_lock_unlock(message.api_lock);

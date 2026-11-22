@@ -77,7 +77,18 @@ void coproc_expansion_callback(
     furi_mutex_acquire(instance->pending_mutex, FuriWaitForever);
 
     if(instance->pending_job_id == job_id) {
-        const size_t copy_size = MIN(data_size, instance->pending_output_capacity);
+        // A result bigger than the caller's buffer would otherwise be cut
+        // short and reported as success; treat it as a failure instead so
+        // coproc_run() falls back to the local implementation.
+        if(data_size > instance->pending_output_capacity) {
+            FURI_LOG_W(
+                TAG,
+                "Result %zu B > buffer %zu B, falling back",
+                data_size,
+                instance->pending_output_capacity);
+            is_error = true;
+        }
+        const size_t copy_size = is_error ? 0 : data_size;
         if(!is_error && instance->pending_output) {
             memcpy(instance->pending_output, data, copy_size);
         }

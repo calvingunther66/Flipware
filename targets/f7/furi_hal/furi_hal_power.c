@@ -519,10 +519,10 @@ void furi_hal_power_info_get(PropertyValueCallback out, char sep, void* context)
 
     if(sep == '.') {
         property_value_out(&property_context, NULL, 2, "format", "major", "2");
-        property_value_out(&property_context, NULL, 2, "format", "minor", "1");
+        property_value_out(&property_context, NULL, 2, "format", "minor", "2");
     } else {
         property_value_out(&property_context, NULL, 3, "power", "info", "major", "2");
-        property_value_out(&property_context, NULL, 3, "power", "info", "minor", "1");
+        property_value_out(&property_context, NULL, 3, "power", "info", "minor", "2");
     }
 
     uint8_t charge = furi_hal_power_get_pct();
@@ -554,6 +554,10 @@ void furi_hal_power_info_get(PropertyValueCallback out, char sep, void* context)
     property_value_out(&property_context, "%d", 2, "battery", "temp", temperature);
     property_value_out(
         &property_context, "%u", 2, "battery", "health", furi_hal_power_get_bat_health_pct());
+    furi_hal_i2c_acquire(&furi_hal_i2c_handle_power);
+    uint16_t cycles = bq27220_get_cycle_count(&furi_hal_i2c_handle_power);
+    furi_hal_i2c_release(&furi_hal_i2c_handle_power);
+    property_value_out(&property_context, "%u", 2, "battery", "cycles", cycles);
     property_value_out(
         &property_context,
         "%lu",

@@ -7,6 +7,7 @@
 #include <lib/toolbox/args.h>
 #include <lib/toolbox/dir_walk.h>
 #include <lib/toolbox/md5_calc.h>
+#include <lib/toolbox/compress.h>
 #include <lib/toolbox/strint.h>
 #include <lib/toolbox/tar/tar_archive.h>
 #include <storage/storage.h>
@@ -588,6 +589,111 @@ static void storage_cli_crc32(PipeSide* pipe, FuriString* path, FuriString* args
     furi_record_close(RECORD_STORAGE);
 }
 
+// Heatshrink round trip through coproc_run(): compresses the file (offloaded
+// to a connected module when it supports it), checks the result against the
+// Flipper's own compress_encode(), then decompresses it again via coproc_run()
+// and checks it matches the file. Input is capped so the compressed result
+// (at most input + 1 bytes) fits one coproc message.
+#define STORAGE_CLI_HEATSHRINK_MAX_FILE_SIZE (4000UL)
+
+static void storage_cli_heatshrink(PipeSide* pipe, FuriString* path, FuriString* args) {
+    UNUSED(pipe);
+    UNUSED(args);
+
+    Storage* api = furi_record_open(RECORD_STORAGE);
+    File* file = storage_file_alloc(api);
+    uint8_t* input = NULL;
+    uint8_t* packed = NULL;
+    uint8_t* local = NULL;
+    uint8_t* unpacked = NULL;
+
+    do {
+        if(!storage_file_open(file, furi_string_get_cstr(path), FSAM_READ, FSOM_OPEN_EXISTING)) {
+            storage_cli_print_error(storage_file_get_error(file));
+            break;
+        }
+        const size_t size = (size_t)storage_file_size(file);
+        if(size == 0 || size > STORAGE_CLI_HEATSHRINK_MAX_FILE_SIZE) {
+            printf("File must be 1..%lu bytes\r\n", STORAGE_CLI_HEATSHRINK_MAX_FILE_SIZE);
+            break;
+        }
+        const size_t cap = size + 16;
+        input = malloc(size);
+        packed = malloc(cap);
+        local = malloc(cap);
+        unpacked = malloc(cap);
+        if(storage_file_read(file, input, size) != size) {
+            storage_cli_print_error(storage_file_get_error(file));
+            break;
+        }
+
+        Coproc* coproc = furi_record_open(RECORD_COPROC);
+        size_t packed_size = cap;
+        bool enc_off = false;
+        uint32_t t0 = furi_get_tick();
+        bool ok = coproc_run(
+            coproc, CoprocTaskCompressHeatshrink, input, size, packed, &packed_size, 2000, &enc_off);
+        const uint32_t enc_ticks = furi_get_tick() - t0;
+
+        size_t unpacked_size = cap;
+        bool dec_off = false;
+        uint32_t dec_ticks = 0;
+        if(ok) {
+            t0 = furi_get_tick();
+            ok = coproc_run(
+                coproc,
+                CoprocTaskDecompressHeatshrink,
+                packed,
+                packed_size,
+                unpacked,
+                &unpacked_size,
+                2000,
+                &dec_off);
+            dec_ticks = furi_get_tick() - t0;
+        }
+        furi_record_close(RECORD_COPROC);
+        if(!ok) {
+            printf("Heatshrink via coproc failed\r\n");
+            break;
+        }
+
+        Compress* compress =
+            compress_alloc(CompressTypeHeatshrink, &compress_config_heatshrink_default);
+        size_t local_size = 0;
+        const bool local_ok = compress_encode(compress, input, size, local, cap, &local_size);
+        compress_free(compress);
+
+        printf(
+            "compress:   %zu -> %zu bytes (%s, %lu ticks)\r\n",
+            size,
+            packed_size,
+            enc_off ? "offloaded" : "local",
+            enc_ticks);
+        printf(
+            "decompress: %zu -> %zu bytes (%s, %lu ticks)\r\n",
+            packed_size,
+            unpacked_size,
+            dec_off ? "offloaded" : "local",
+            dec_ticks);
+        printf(
+            "matches local compress_encode: %s\r\n",
+            (local_ok && local_size == packed_size && !memcmp(local, packed, packed_size)) ?
+                "yes" :
+                "NO");
+        printf(
+            "round trip: %s\r\n",
+            (unpacked_size == size && !memcmp(unpacked, input, size)) ? "ok" : "MISMATCH");
+    } while(false);
+
+    free(input);
+    free(packed);
+    free(local);
+    free(unpacked);
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+}
+
 static bool tar_extract_file_callback(const char* name, bool is_directory, void* context) {
     UNUSED(context);
     printf("\t%s %s\r\n", is_directory ? "D" : "F", name);
@@ -662,6 +768,11 @@ static const StorageCliCommand storage_cli_commands[] = {
         "crc32",
         "crc32 of the file, offloaded to a connected expansion module if available",
         &storage_cli_crc32,
+    },
+    {
+        "heatshrink",
+        "heatshrink round trip of a small file (<=4000 B) via coproc, checked against local",
+        &storage_cli_heatshrink,
     },
     {
         "stat",

@@ -581,3 +581,7 @@ uint16_t bq27220_get_state_of_charge(const FuriHalI2cBusHandle* handle) {
 uint16_t bq27220_get_state_of_health(const FuriHalI2cBusHandle* handle) {
     return bq27220_read_word(handle, CommandStateOfHealth);
 }
+
+uint16_t bq27220_get_cycle_count(const FuriHalI2cBusHandle* handle) {
+    return bq27220_read_word(handle, CommandCycleCount);
+}
