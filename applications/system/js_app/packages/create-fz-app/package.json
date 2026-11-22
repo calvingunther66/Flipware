@@ -15,7 +15,7 @@
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Next-Flip/Momentum-Firmware.git",
+    "url": "git+https://github.com/calvingunther66/Flipware.git",
     "directory": "applications/system/js_app/packages/create-fz-app"
   },
   "dependencies": {

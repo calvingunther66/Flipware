@@ -121,6 +121,9 @@ lib_targets = env.BuildModules(
 env.Append(
     CPPDEFINES=[
         env.subst("FW_ORIGIN_${FIRMWARE_ORIGIN}"),
+        # Flipware keeps Momentum's app API, so apps that check for
+        # Momentum-only features keep working.
+        "FW_ORIGIN_Momentum",
     ]
 )
 

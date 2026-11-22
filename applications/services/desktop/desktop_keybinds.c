@@ -44,8 +44,10 @@ void desktop_keybinds_migrate(Desktop* desktop) {
                         furi_string_set(keybind, "125 kHz RFID");
                     } else if(furi_string_equal(keybind, "SubGHz")) {
                         furi_string_set(keybind, "Sub-GHz");
-                    } else if(furi_string_equal(keybind, "Xtreme")) {
-                        furi_string_set(keybind, "Momentum");
+                    } else if(
+                        furi_string_equal(keybind, "Xtreme") ||
+                        furi_string_equal(keybind, "Momentum")) {
+                        furi_string_set(keybind, "Flipware");
                     }
                     new[type][key] = keybind;
                 }

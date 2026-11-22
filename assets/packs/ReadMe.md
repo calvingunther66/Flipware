@@ -1,9 +1,9 @@
 # Pre-included Asset Packs
 
-- **`Momentum`** - Credits:
-  - [Kuronons](https://github.com/Kuronons) for the [desktop animations](https://github.com/Kuronons/FZ_graphics/tree/main/Animations/Custom_Firmwares)
-  - [Kuronons](https://github.com/Kuronons) for the [passport portraits](https://github.com/Kuronons/FZ_graphics/tree/main/Passport%20profile%20pictures)
-  - [Kuronons](https://github.com/Kuronons) for the [passport background](https://github.com/Kuronons/FZ_graphics/tree/main/Passport%20background) (not in asset pack, it's in base firmware)
+Momentum's own pack (its capybara theme and logo animations) was removed in
+the Flipware rebrand; it is still in git history. The passport background by
+[Kuronons](https://github.com/Kuronons/FZ_graphics/tree/main/Passport%20background)
+is part of the base firmware.
 
 - **`WatchDogs`** - Credits:
   - [WrenchAtHome](https://github.com/wrenchathome) for some [desktop animations](https://github.com/wrenchathome/flip0anims)
