@@ -343,16 +343,13 @@ int32_t update_task_worker_flash_writer(void* context) {
         furi_hal_rtc_set_boot_mode(FuriHalRtcBootModePostUpdate);
         // Clean up /int before restoring backup on next boot
         furi_hal_rtc_set_flag(FuriHalRtcFlagStorageFormatInternal);
+        // Flipware keeps the user's system settings across updates: debug
+        // mode, log level/device/baud, sleep mode and heap tracking live in
+        // the RTC backup registers and are left exactly as they were.
+        // (Upstream forced production defaults here on every update.)
 #ifdef FURI_DEBUG
-        // Development
+        // Development builds still switch debug on, without touching the rest.
         furi_hal_rtc_set_flag(FuriHalRtcFlagDebug);
-        furi_hal_rtc_set_flag(FuriHalRtcFlagLegacySleep);
-#else
-        // Production
-        furi_hal_rtc_set_log_level(FuriLogLevelNone);
-        furi_hal_rtc_reset_flag(FuriHalRtcFlagDebug);
-        furi_hal_rtc_reset_flag(FuriHalRtcFlagLegacySleep);
-        furi_hal_rtc_set_heap_track_mode(FuriHalRtcHeapTrackModeNone);
 #endif
         update_task_set_progress(update_task, UpdateTaskStageCompleted, 100);
         success = true;
