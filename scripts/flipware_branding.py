@@ -6,6 +6,7 @@ Writes:
   assets/icons/MainMenu/Momentum_14/frame_XX.png   main-menu icon (a flipping "F")
   assets/icons/ControlCenter/CC_Momentum_16x16.png lock-menu tile icon
   assets/slideshow/firstboot/frame_0{0,1,4,5,6}.png intro slides
+  assets/slideshow/update_default/frame_00.png     "updated" splash after an update
 
 The icon file and symbol names stay the same on purpose: they are part of
 the app API (A_Momentum_14, I_CC_Momentum_16x16), so renaming them would
@@ -176,6 +177,22 @@ def make_slides():
     save_slide(img, 6)
 
 
+def make_update_splash():
+    # Wordmark + "Firmware" in place of the old logo; the OK/Updated box stays.
+    path = ROOT / "assets/slideshow/update_default/frame_00.png"
+    img = Image.open(path).convert("1")
+    fill(img, (0, 0, 128, 38))
+    w = big_width("FLIPWARE", 2)
+    x = (128 - w) // 2
+    draw_big(img, "FLIPWARE", x, 9)
+    t = small_width("Firmware")
+    tx = (128 - t) // 2
+    draw_small(img, "Firmware", tx, 27)
+    fill(img, (x, 31, tx - 4, 32), BLACK)
+    fill(img, (tx + t + 4, 31, x + w, 32), BLACK)
+    img.save(path)
+
+
 def f_frame(width, back=False):
     """10x14 "F" squeezed to `width` around the centre; back = card back."""
     img = Image.new("1", (14, 14), WHITE)
@@ -238,5 +255,6 @@ def make_readme_logo():
 if __name__ == "__main__":
     make_readme_logo()
     make_slides()
+    make_update_splash()
     make_menu_icon()
     make_cc_icon()
