@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flipware</title>
+  <meta name="description" content="Flipware is open-source custom firmware for Flipper Zero, built on Momentum.">
+  <link rel="icon" href="img/favicon.png">
+  <link rel="stylesheet" href="style.css">
+  <script src="analytics.js"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#"><img src="img/favicon.png" alt="" width="20" height="20"> Flipware</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#build">Build</a>
+      <a href="https://github.com/calvingunther66/Flipware" data-cta="nav_github">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="img/flipware_logo_dark.png">
+        <img class="wordmark" src="img/flipware_logo_light.png" alt="Flipware">
+      </picture>
+      <p class="tagline">Open-source custom firmware for Flipper Zero.</p>
+      <p class="lede">Everything Momentum offers, plus a desktop on the Video Game Module, a USB
+        display stream and compute offload to the RP2040.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/calvingunther66/Flipware/releases" data-cta="hero_download">Download</a>
+        <a class="btn" href="https://github.com/calvingunther66/Flipware" data-cta="hero_source">Source code</a>
+      </div>
+      <div class="lcd"><img src="img/slide_0.png" alt="Flipware welcome screen on the Flipper" width="512" height="256"></div>
+    </section>
+
+    <section id="features">
+      <h2>What Flipware adds</h2>
+      <div class="cards">
+        <article>
+          <h3>VGM desktop</h3>
+          <p>The Video Game Module shows a full desktop over HDMI: a live mirror of the Flipper
+            screen, an SD card file browser and an app dock, driven by keyboard and mouse.</p>
+        </article>
+        <article>
+          <h3>USB display stream</h3>
+          <p>The same desktop streams out of the VGM's USB-C port, so a computer can be its screen
+            and keyboard.</p>
+        </article>
+        <article>
+          <h3>Coprocessor offload</h3>
+          <p>The Flipper hands compute jobs to the RP2040 over a faster expansion link with DMA
+            receive at 2&nbsp;Mbaud.</p>
+        </article>
+        <article>
+          <h3>All of Momentum</h3>
+          <p>Asset packs, main menu and lock screen customisation, Bad KB and the extended Sub-GHz
+            and NFC tools. Apps built for Momentum keep working.</p>
+        </article>
+      </div>
+      <div class="shots">
+        <figure><img src="img/slide_4.png" alt="Lock menu with the Flipware tile" width="512" height="256"><figcaption>Lock menu</figcaption></figure>
+        <figure><img src="img/slide_5.png" alt="Flipware settings overview" width="512" height="256"><figcaption>Flipware settings</figcaption></figure>
+      </div>
+    </section>
+
+    <section id="install">
+      <h2>Install</h2>
+      <ol class="steps">
+        <li>Download the <code>.tgz</code> package from the
+          <a href="https://github.com/calvingunther66/Flipware/releases" data-cta="install_release">latest release</a>.</li>
+        <li>Open <a href="https://flipperzero.one/update">qFlipper</a> and connect your Flipper.</li>
+        <li>Click <strong>Install from file</strong>, pick the <code>.tgz</code> and wait for the update to finish.</li>
+      </ol>
+      <p class="note">Prefer the SD card? Extract the release <code>.zip</code> into <code>SD/update</code>,
+        then run <code>Update</code> from the Flipper's file browser.</p>
+    </section>
+
+    <section id="build">
+      <h2>Build it yourself</h2>
+<div class="code">
+        <button class="copy" type="button" data-copy="build-cmd">Copy</button>
+<pre><code id="build-cmd">git clone --recursive --jobs 8 https://github.com/calvingunther66/Flipware.git
+cd Flipware
+./fbt flash_usb_full     # flash over USB
+./fbt updater_package    # build a .tgz update package</code></pre>
+      </div>
+    </section>
+
+    <section id="credits">
+      <h2>Credits and license</h2>
+      <p>Flipware is built on <a href="https://github.com/Next-Flip/Momentum-Firmware">Momentum</a>,
+        <a href="https://github.com/DarkFlippers/unleashed-firmware">Unleashed</a> and the
+        <a href="https://github.com/flipperdevices/flipperzero-firmware">Official Firmware</a>, and
+        bundles apps by many authors. It is free software under the
+        <a href="https://github.com/calvingunther66/Flipware/blob/dev/LICENSE">GNU GPL v3.0</a>.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Flipware is not affiliated with Flipper Devices Inc. or the Momentum team. "Flipper Zero" is
+      a trademark of Flipper Devices Inc., used only to name the device this firmware runs on.</p>
+    <p>This site uses Google Analytics to count visits and see which parts people read, so we know
+      what to work on. <a href="#" id="consent-open">Analytics settings</a></p>
+  </footer>
+
+  <div id="consent" class="consent" role="dialog" aria-label="Analytics consent" hidden>
+    <p>Can we count your visit with Google Analytics? It helps us see what people read. No ads, no
+      selling data.</p>
+    <div class="consent-actions">
+      <button type="button" class="btn primary" data-consent="granted">Allow</button>
+      <button type="button" class="btn" data-consent="denied">No thanks</button>
+    </div>
+  </div>
+</body>
+</html>

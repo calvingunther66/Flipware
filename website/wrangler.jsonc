@@ -1,0 +1,15 @@
+{
+  // Flipware website: a static-assets Worker on flipware-fw.dev.
+  // Deploy with: npx wrangler deploy (from this folder).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "flipware-site",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "flipware-fw.dev", "custom_domain": true },
+    { "pattern": "www.flipware-fw.dev", "custom_domain": true }
+  ]
+}

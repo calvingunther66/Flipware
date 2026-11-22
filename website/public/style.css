@@ -1,0 +1,192 @@
+:root {
+  --bg: #f4f4ef;
+  --surface: #ffffff;
+  --ink: #111111;
+  --muted: #55554f;
+  --line: #d9d9d0;
+  --accent: #2f6df6;
+  --lcd: #e9ecdf;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0f10;
+    --surface: #17191b;
+    --ink: #f2f2ee;
+    --muted: #a3a39b;
+    --line: #2a2d30;
+    --accent: #6f9bff;
+    --lcd: #d9dccf;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.6 var(--sans);
+}
+
+a { color: var(--accent); }
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 16px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font: 700 18px var(--mono);
+  text-decoration: none;
+}
+
+.brand img { image-rendering: pixelated; }
+
+nav { display: flex; gap: 18px; flex-wrap: wrap; }
+nav a { color: var(--muted); text-decoration: none; font: 14px var(--mono); }
+nav a:hover { color: var(--ink); }
+
+main { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+section { padding: 48px 0; border-top: 1px solid var(--line); }
+section.hero { border-top: 0; text-align: center; padding-top: 32px; }
+
+.wordmark {
+  width: min(460px, 100%);
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.tagline { font: 600 20px var(--mono); margin: 16px 0 8px; }
+.lede { color: var(--muted); max-width: 620px; margin: 0 auto; }
+
+.cta { display: flex; gap: 12px; justify-content: center; margin: 28px 0 36px; flex-wrap: wrap; }
+
+.btn {
+  padding: 10px 20px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  color: var(--ink);
+  font: 600 15px var(--mono);
+  text-decoration: none;
+}
+
+.btn.primary { background: var(--ink); color: var(--bg); }
+
+.lcd, .shots figure {
+  display: inline-block;
+  margin: 0;
+  padding: 14px;
+  background: var(--lcd);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+}
+
+.lcd img, .shots img {
+  display: block;
+  width: 100%;
+  max-width: 512px;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+h2 { font: 700 24px var(--mono); margin: 0 0 20px; }
+h3 { font: 700 16px var(--mono); margin: 0 0 6px; }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+}
+
+.cards article {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+}
+
+.cards p { margin: 0; color: var(--muted); font-size: 15px; }
+
+.shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.shots figure { display: block; }
+.shots figcaption { margin-top: 8px; font: 13px var(--mono); color: #33332e; text-align: center; }
+
+.steps { padding-left: 22px; }
+.steps li { margin-bottom: 6px; }
+.note { color: var(--muted); }
+
+code { font-family: var(--mono); font-size: 0.92em; }
+
+pre {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 14px;
+}
+
+footer {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 16px 140px;
+  color: var(--muted);
+  font-size: 13px;
+  border-top: 1px solid var(--line);
+}
+
+.code { position: relative; }
+
+.copy {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 12px var(--mono);
+  cursor: pointer;
+}
+
+.consent {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 16px;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  z-index: 10;
+}
+
+.consent[hidden] { display: none; }
+.consent p { margin: 0 0 12px; font-size: 14px; }
+.consent-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.consent .btn { cursor: pointer; background: transparent; }
+.consent .btn.primary { background: var(--ink); color: var(--bg); }
