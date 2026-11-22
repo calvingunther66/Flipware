@@ -279,3 +279,11 @@ uint16_t bq27220_get_state_of_charge(const FuriHalI2cBusHandle* handle);
  * @return     state of health in percents or BQ27220_ERROR
  */
 uint16_t bq27220_get_state_of_health(const FuriHalI2cBusHandle* handle);
+
+/** Get charge cycle count
+ *
+ * @param      handle  The I2C Bus handle
+ *
+ * @return     number of full charge cycles the gauge has counted, or BQ27220_ERROR
+ */
+uint16_t bq27220_get_cycle_count(const FuriHalI2cBusHandle* handle);
