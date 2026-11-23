@@ -10,7 +10,7 @@ App(
         "desktop",
         "loader",
         "power",
-        "coproc",
+        "coproc_start",
     ],
     sdk_headers=["applications.h"],
 )
