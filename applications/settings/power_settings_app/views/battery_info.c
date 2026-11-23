@@ -112,9 +112,9 @@ static void draw_detail(Canvas* canvas, BatteryInfoModel* model) {
     canvas_set_font(canvas, FontSecondary);
 
     snprintf(line, sizeof(line), "Health: %u%%", model->health);
-    canvas_draw_str(canvas, 2, 22, line);
+    canvas_draw_str(canvas, 2, 21, line);
     snprintf(line, sizeof(line), "Cycles: %u", model->cycles);
-    canvas_draw_str(canvas, 70, 22, line);
+    canvas_draw_str(canvas, 70, 21, line);
 
     snprintf(
         line,
@@ -122,12 +122,12 @@ static void draw_detail(Canvas* canvas, BatteryInfoModel* model) {
         "Full: %lu / %lu mAh",
         model->capacity_full,
         model->capacity_design);
-    canvas_draw_str(canvas, 2, 33, line);
+    canvas_draw_str(canvas, 2, 31, line);
     snprintf(line, sizeof(line), "Remaining: %lu mAh", model->capacity_remaining);
-    canvas_draw_str(canvas, 2, 44, line);
+    canvas_draw_str(canvas, 2, 41, line);
 
     snprintf(line, sizeof(line), "Current: %ld mA", current);
-    canvas_draw_str(canvas, 2, 55, line);
+    canvas_draw_str(canvas, 2, 51, line);
     if(locale_get_measurement_unit() == LocaleMeasurementUnitsMetric) {
         snprintf(line, sizeof(line), "%ld C", (int32_t)model->gauge_temperature);
     } else {
@@ -137,13 +137,13 @@ static void draw_detail(Canvas* canvas, BatteryInfoModel* model) {
             "%ld F",
             (int32_t)locale_celsius_to_fahrenheit(model->gauge_temperature));
     }
-    canvas_draw_str_aligned(canvas, 126, 55, AlignRight, AlignBottom, line);
+    canvas_draw_str_aligned(canvas, 126, 51, AlignRight, AlignBottom, line);
 
     // A worn cell: the gauge's learned capacity under 80% of design.
     if(model->health < 80) {
         canvas_draw_str_aligned(canvas, 126, 10, AlignRight, AlignBottom, "Worn");
     }
-    canvas_draw_str_aligned(canvas, 64, 64, AlignCenter, AlignBottom, "OK: summary");
+    canvas_draw_str_aligned(canvas, 64, 62, AlignCenter, AlignBottom, "OK: summary");
 }
 
 static void battery_info_draw_callback(Canvas* canvas, void* context) {
