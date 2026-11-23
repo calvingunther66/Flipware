@@ -162,6 +162,12 @@ uint32_t furi_hal_power_get_battery_full_capacity(void);
  */
 uint32_t furi_hal_power_get_battery_design_capacity(void);
 
+/** Get battery charge cycle count from the fuel gauge
+ *
+ * @return     number of full charge cycles counted by the gauge
+ */
+uint16_t furi_hal_power_get_battery_cycle_count(void);
+
 /** Get battery voltage in V
  *
  * @param[in]      ic    FuriHalPowerIc to get measurment

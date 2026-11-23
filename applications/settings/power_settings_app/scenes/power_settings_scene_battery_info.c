@@ -1,4 +1,5 @@
 #include "../power_settings_app.h"
+#include <furi_hal_power.h>
 
 static void power_settings_scene_battery_info_update_model(PowerSettingsApp* app) {
     power_get_info(app->power, &app->info);
@@ -10,6 +11,10 @@ static void power_settings_scene_battery_info_update_model(PowerSettingsApp* app
         .charge_voltage_limit = app->info.voltage_battery_charge_limit,
         .charge = app->info.charge,
         .health = app->info.health,
+        .cycles = furi_hal_power_get_battery_cycle_count(),
+        .capacity_remaining = app->info.capacity_remaining,
+        .capacity_full = app->info.capacity_full,
+        .capacity_design = furi_hal_power_get_battery_design_capacity(),
         .alt = app->about_battery,
     };
     battery_info_set_data(app->battery_info, &battery_info_data);

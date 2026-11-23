@@ -103,11 +103,59 @@ static void draw_battery(Canvas* canvas, BatteryInfoModel* data, int x, int y) {
     }
 }
 
+static void draw_detail(Canvas* canvas, BatteryInfoModel* model) {
+    char line[32];
+    int32_t current = 1000.0f * model->gauge_current;
+
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str(canvas, 2, 10, "Battery health");
+    canvas_set_font(canvas, FontSecondary);
+
+    snprintf(line, sizeof(line), "Health: %u%%", model->health);
+    canvas_draw_str(canvas, 2, 22, line);
+    snprintf(line, sizeof(line), "Cycles: %u", model->cycles);
+    canvas_draw_str(canvas, 70, 22, line);
+
+    snprintf(
+        line,
+        sizeof(line),
+        "Full: %lu / %lu mAh",
+        model->capacity_full,
+        model->capacity_design);
+    canvas_draw_str(canvas, 2, 33, line);
+    snprintf(line, sizeof(line), "Remaining: %lu mAh", model->capacity_remaining);
+    canvas_draw_str(canvas, 2, 44, line);
+
+    snprintf(line, sizeof(line), "Current: %ld mA", current);
+    canvas_draw_str(canvas, 2, 55, line);
+    if(locale_get_measurement_unit() == LocaleMeasurementUnitsMetric) {
+        snprintf(line, sizeof(line), "%ld C", (int32_t)model->gauge_temperature);
+    } else {
+        snprintf(
+            line,
+            sizeof(line),
+            "%ld F",
+            (int32_t)locale_celsius_to_fahrenheit(model->gauge_temperature));
+    }
+    canvas_draw_str_aligned(canvas, 126, 55, AlignRight, AlignBottom, line);
+
+    // A worn cell: the gauge's learned capacity under 80% of design.
+    if(model->health < 80) {
+        canvas_draw_str_aligned(canvas, 126, 10, AlignRight, AlignBottom, "Worn");
+    }
+    canvas_draw_str_aligned(canvas, 64, 64, AlignCenter, AlignBottom, "OK: summary");
+}
+
 static void battery_info_draw_callback(Canvas* canvas, void* context) {
     furi_assert(context);
     BatteryInfoModel* model = context;
 
     canvas_clear(canvas);
+    if(model->detail && !model->alt) {
+        canvas_set_color(canvas, ColorBlack);
+        draw_detail(canvas, model);
+        return;
+    }
     canvas_set_color(canvas, ColorBlack);
     draw_battery(canvas, model, 0, model->alt ? 0 : 5);
 
@@ -160,6 +208,12 @@ static bool battery_info_input_callback(InputEvent* event, void* context) {
     bool about_battery;
     with_view_model(
         battery_info->view, BatteryInfoModel * model, { about_battery = model->alt; }, false);
+    if(!about_battery && event->type == InputTypeShort &&
+       (event->key == InputKeyOk || event->key == InputKeyUp || event->key == InputKeyDown)) {
+        with_view_model(
+            battery_info->view, BatteryInfoModel * model, { model->detail = !model->detail; }, true);
+        return true;
+    }
     if(about_battery && event->type == InputTypeShort) {
         if(event->key == InputKeyLeft) {
             event->key = InputKeyBack;
@@ -200,6 +254,10 @@ void battery_info_set_data(BatteryInfo* battery_info, BatteryInfoModel* data) {
     with_view_model(
         battery_info->view,
         BatteryInfoModel * model,
-        { memcpy(model, data, sizeof(BatteryInfoModel)); },
+        {
+            bool detail = model->detail;
+            memcpy(model, data, sizeof(BatteryInfoModel));
+            model->detail = detail;
+        },
         true);
 }

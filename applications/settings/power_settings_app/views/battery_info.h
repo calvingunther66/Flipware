@@ -15,7 +15,12 @@ typedef struct {
     float charge_voltage_limit;
     uint8_t charge;
     uint8_t health;
+    uint16_t cycles;
+    uint32_t capacity_remaining;
+    uint32_t capacity_full;
+    uint32_t capacity_design;
     bool alt;
+    bool detail; /* owned by the view: Up/Down/OK toggles it, set_data keeps it */
 } BatteryInfoModel;
 
 BatteryInfo* battery_info_alloc(void);
