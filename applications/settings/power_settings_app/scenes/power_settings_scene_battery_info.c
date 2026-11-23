@@ -22,6 +22,12 @@ static void power_settings_scene_battery_info_update_model(PowerSettingsApp* app
 
 void power_settings_scene_battery_info_on_enter(void* context) {
     PowerSettingsApp* app = context;
+    // Always open on the summary page.
+    with_view_model(
+        battery_info_get_view(app->battery_info),
+        BatteryInfoModel * model,
+        { model->detail = false; },
+        false);
     power_settings_scene_battery_info_update_model(app);
     view_dispatcher_switch_to_view(app->view_dispatcher, PowerSettingsAppViewBatteryInfo);
 }
