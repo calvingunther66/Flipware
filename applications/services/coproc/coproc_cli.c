@@ -50,8 +50,7 @@ static bool coproc_cli_parse_mode(const char* word, uint8_t* mode) {
         *mode = CoprocGpioModeOutput;
     } else if(!strcmp(word, "up") || !strcmp(word, "pullup") || !strcmp(word, "pull-up")) {
         *mode = CoprocGpioModePullUp;
-    } else if(
-        !strcmp(word, "down") || !strcmp(word, "pulldown") || !strcmp(word, "pull-down")) {
+    } else if(!strcmp(word, "down") || !strcmp(word, "pulldown") || !strcmp(word, "pull-down")) {
         *mode = CoprocGpioModePullDown;
     } else {
         return false;
@@ -115,7 +114,8 @@ static void coproc_cli_gpio(FuriString* args) {
         furi_record_close(RECORD_COPROC);
 
         if(!ok || result_size != COPROC_GPIO_RECORD_SIZE) {
-            printf("No answer from the VGM (not attached, or its firmware lacks the GPIO task)\r\n");
+            printf(
+                "No answer from the VGM (not attached, or its firmware lacks the GPIO task)\r\n");
             break;
         }
 
@@ -132,10 +132,7 @@ static void coproc_cli_gpio(FuriString* args) {
             break;
         case CoprocGpioOpAdc:
             printf(
-                "GPIO %d: adc %u (%lu mV)\r\n",
-                pin,
-                value,
-                (unsigned long)value * 3300UL / 4095UL);
+                "GPIO %d: adc %u (%lu mV)\r\n", pin, value, (unsigned long)value * 3300UL / 4095UL);
             break;
         default:
             printf("GPIO %d: ok\r\n", pin);

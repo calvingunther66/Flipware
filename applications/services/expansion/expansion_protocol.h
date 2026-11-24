@@ -315,7 +315,8 @@ static inline bool expansion_frame_get_remaining_size(
             // Malformed frame or garbage input
             return false;
         } else {
-            content_size = offsetof(ExpansionFrameCoproc, payload) + frame->content.coproc.payload_len;
+            content_size =
+                offsetof(ExpansionFrameCoproc, payload) + frame->content.coproc.payload_len;
         }
         break;
     default:

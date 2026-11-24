@@ -117,11 +117,7 @@ static void draw_detail(Canvas* canvas, BatteryInfoModel* model) {
     canvas_draw_str(canvas, 70, 21, line);
 
     snprintf(
-        line,
-        sizeof(line),
-        "Full: %lu / %lu mAh",
-        model->capacity_full,
-        model->capacity_design);
+        line, sizeof(line), "Full: %lu / %lu mAh", model->capacity_full, model->capacity_design);
     canvas_draw_str(canvas, 2, 31, line);
     snprintf(line, sizeof(line), "Remaining: %lu mAh", model->capacity_remaining);
     canvas_draw_str(canvas, 2, 41, line);
@@ -211,7 +207,10 @@ static bool battery_info_input_callback(InputEvent* event, void* context) {
     if(!about_battery && event->type == InputTypeShort &&
        (event->key == InputKeyOk || event->key == InputKeyUp || event->key == InputKeyDown)) {
         with_view_model(
-            battery_info->view, BatteryInfoModel * model, { model->detail = !model->detail; }, true);
+            battery_info->view,
+            BatteryInfoModel * model,
+            { model->detail = !model->detail; },
+            true);
         return true;
     }
     if(about_battery && event->type == InputTypeShort) {
