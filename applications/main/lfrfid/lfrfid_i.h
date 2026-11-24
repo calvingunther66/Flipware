@@ -15,6 +15,7 @@
 #include <gui/modules/popup.h>
 #include <gui/modules/text_input.h>
 #include <gui/modules/byte_input.h>
+#include <gui/modules/number_input.h>
 #include <gui/modules/widget.h>
 
 #include <lfrfid/views/lfrfid_view_read.h>
@@ -33,6 +34,7 @@
 #include <lfrfid/lfrfid_worker.h>
 
 #include <lfrfid/scenes/lfrfid_scene.h>
+#include "helpers/lfrfid_manual_format.h"
 
 #define LFRFID_TEXT_STORE_SIZE 40
 
@@ -99,6 +101,10 @@ struct LfRfid {
 
     uint8_t password[4];
 
+    uint32_t manual_format; // Add Manually entry, see lfrfid_manual_format.h
+    uint64_t field_values[LFRFID_MANUAL_FORMAT_FIELDS_MAX]; // its fields entered so far
+    size_t field_index; // the field being entered
+
     RpcAppSystem* rpc_ctx;
     LfRfidRpcState rpc_state;
 
@@ -108,6 +114,7 @@ struct LfRfid {
     Popup* popup;
     TextInput* text_input;
     ByteInput* byte_input;
+    NumberInput* number_input;
 
     // Custom views
     LfRfidReadView* read_view;
@@ -122,6 +129,7 @@ typedef enum {
     LfRfidViewWidget,
     LfRfidViewTextInput,
     LfRfidViewByteInput,
+    LfRfidViewNumberInput,
     LfRfidViewRead,
 } LfRfidView;
 
