@@ -89,7 +89,7 @@ static void js_vgm_delta_yaw(struct mjs* mjs) {
         mjs_prepend_errorf(
             mjs,
             MJS_BAD_ARGS_ERROR,
-            "Invalid args. Pass (angle [, timeout]). Got %d args.",
+            "Invalid args. Pass (angle [, timeout]). Got %zu args.",
             num_args);
         mjs_return(mjs, mjs_mk_undefined());
         return;
