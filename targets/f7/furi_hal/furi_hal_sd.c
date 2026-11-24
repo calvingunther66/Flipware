@@ -21,6 +21,7 @@
 #define FLAG_SET(x, y) (((x) & (y)) == (y))
 
 static bool sd_high_capacity = false;
+static volatile FuriHalSdPowerResetGuard sd_power_reset_guard = NULL;
 
 typedef enum {
     SdSpiDataResponceOK = 0x05,
@@ -1080,19 +1081,17 @@ FuriStatus furi_hal_sd_get_card_state(void) {
     return status;
 }
 
-/* Whether a read/write retry may power-cycle the card. A power reset cuts
- * ext3.3V, which also feeds header pin 9, so an attached module (VGM, dev
- * board) browns out. The expansion service overrides this; without it every
- * even retry power-cycles as before. Firmware-internal, not in the SDK. */
-__attribute__((weak)) bool furi_hal_sd_power_reset_allowed(void) {
-    return true;
+void furi_hal_sd_set_power_reset_guard(FuriHalSdPowerResetGuard guard) {
+    sd_power_reset_guard = guard;
 }
 
-static bool furi_hal_sd_retry_power_reset(uint8_t counter) {
+// Even retry attempts power-cycle the card, unless the guard objects. The
+// last even attempt (counter == 2) always may, as a last resort.
+static bool sd_retry_power_reset(uint8_t counter) {
     if((counter % 2) != 0) return false;
-    // Same rule as the mount retries: with a module attached, only the last
-    // even attempt power-cycles the card.
-    return counter <= 2 || furi_hal_sd_power_reset_allowed();
+    if(counter <= 2) return true;
+    FuriHalSdPowerResetGuard guard = sd_power_reset_guard;
+    return guard == NULL || guard();
 }
 
 FuriStatus furi_hal_sd_read_blocks(uint32_t* buff, uint32_t sector, uint32_t count) {
@@ -1113,7 +1112,7 @@ FuriStatus furi_hal_sd_read_blocks(uint32_t* buff, uint32_t sector, uint32_t cou
         uint8_t counter = furi_hal_sd_max_mount_retry_count();
 
         while(status != FuriStatusOk && counter > 0 && furi_hal_sd_is_present()) {
-            status = furi_hal_sd_init(furi_hal_sd_retry_power_reset(counter));
+            status = furi_hal_sd_init(sd_retry_power_reset(counter));
 
             if(status == FuriStatusOk) {
                 status = sd_device_read(buff, sector, count);
@@ -1142,7 +1141,7 @@ FuriStatus furi_hal_sd_write_blocks(const uint32_t* buff, uint32_t sector, uint3
         uint8_t counter = furi_hal_sd_max_mount_retry_count();
 
         while(status != FuriStatusOk && counter > 0 && furi_hal_sd_is_present()) {
-            status = furi_hal_sd_init(furi_hal_sd_retry_power_reset(counter));
+            status = furi_hal_sd_init(sd_retry_power_reset(counter));
 
             if(status == FuriStatusOk) {
                 status = sd_device_write(buff, sector, count);

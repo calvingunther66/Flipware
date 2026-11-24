@@ -1,5 +1,6 @@
 #include "expansion.h"
 
+#include <furi_hal_sd.h>
 #include <furi_hal_serial_control.h>
 
 #include <furi.h>
@@ -22,9 +23,8 @@ bool expansion_is_module_present(void) {
     return expansion_module_present;
 }
 
-// Overrides the weak default in furi_hal_sd.c: SD read/write retries must not
-// power-cycle the card (and so ext3.3V) while a module is attached.
-bool furi_hal_sd_power_reset_allowed(void) {
+// Asked by the SD HAL before an I/O error retry cuts ext3.3V (header pin 9).
+static bool expansion_sd_power_reset_allowed(void) {
     return !expansion_module_present;
 }
 
@@ -361,6 +361,8 @@ static void expansion_storage_callback(const void* message, void* context) {
 
 void expansion_on_system_start(void* arg) {
     UNUSED(arg);
+
+    furi_hal_sd_set_power_reset_guard(expansion_sd_power_reset_allowed);
 
     Expansion* instance = expansion_alloc();
     furi_record_create(RECORD_EXPANSION, instance);

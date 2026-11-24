@@ -110,7 +110,7 @@ void coproc_expansion_callback(
 // coproc_run() and the expansion callback run on their callers' threads and
 // share this struct through its mutexes, so an idle thread (1 KB stack plus
 // thread object and queue) bought nothing.
-void coproc_on_system_start(void) {
+void coproc_srv_on_system_start(void) {
     Coproc* instance = malloc(sizeof(Coproc));
 
     instance->job_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
@@ -133,6 +133,8 @@ void coproc_on_system_start(void) {
         instance, CoprocTaskCompressHeatshrink, coproc_fallback_compress, NULL);
     coproc_register_fallback(
         instance, CoprocTaskDecompressHeatshrink, coproc_fallback_decompress, NULL);
+    // CoprocTaskHidInject and CoprocTaskGpio act on the module's own hardware,
+    // so they have no local fallback: coproc_run() returns false without one.
 
     furi_record_create(RECORD_COPROC, instance);
 }

@@ -1,9 +1,18 @@
 App(
     appid="coproc",
     apptype=FlipperAppType.STARTUP,
-    entry_point="coproc_on_system_start",
+    entry_point="coproc_srv_on_system_start",
     cdefines=["SRV_COPROC"],
     requires=["expansion_start"],
+    provides=["coproc_start"],
     order=130,
     sdk_headers=["coproc.h"],
+)
+
+App(
+    appid="coproc_start",
+    apptype=FlipperAppType.STARTUP,
+    entry_point="coproc_on_system_start",
+    requires=["coproc"],
+    order=140,
 )
