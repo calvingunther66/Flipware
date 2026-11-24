@@ -3,7 +3,7 @@ import Darwin
 import Foundation
 
 enum SerialError: Error, CustomStringConvertible {
-    case noFlipper, severalFlippers([String]), open(String, Int32), timeout(String), io(Int32)
+    case noFlipper, severalFlippers([String]), open(String, Int32), timeout(String), io(Int32), appOpen
 
     var description: String {
         switch self {
@@ -12,6 +12,7 @@ enum SerialError: Error, CustomStringConvertible {
         case .open(let path, let err): return "Could not open \(path): \(String(cString: strerror(err)))"
         case .timeout(let what): return "Timed out waiting for \(what)."
         case .io(let err): return "Serial I/O error: \(String(cString: strerror(err)))"
+        case .appOpen: return "An app is open on the Flipper. Close it (Back to the desktop), then try again."
         }
     }
 }
@@ -93,7 +94,13 @@ final class SerialPort {
     /// Send one command and collect its `hostauth-*` reply lines.
     func command(_ line: String, timeout: TimeInterval = 5) throws -> [ReplyLine] {
         try write(line)
-        return try readUntilPrompt(timeout: timeout).compactMap(ReplyLine.init)
+        let lines = try readUntilPrompt(timeout: timeout)
+        // The shell refuses `hostauth` while an app is open (it takes the loader
+        // lock, so it never competes with an app for memory)
+        if lines.contains(where: { $0.contains("cannot be run while an application is open") }) {
+            throw SerialError.appOpen
+        }
+        return lines.compactMap(ReplyLine.init)
     }
 
     /// Wake the shell and drop the banner.
