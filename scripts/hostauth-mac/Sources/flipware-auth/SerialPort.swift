@@ -94,7 +94,19 @@ final class SerialPort {
     /// Send one command and collect its `hostauth-*` reply lines.
     func command(_ line: String, timeout: TimeInterval = 5) throws -> [ReplyLine] {
         try write(line)
-        let lines = try readUntilPrompt(timeout: timeout)
+        // Stale prompts (the banner's, or one from sync()'s empty line) can still be
+        // queued. Skip ahead to the shell's echo of this command and use what follows.
+        let deadline = Date().addingTimeInterval(timeout)
+        var lines: [String] = []
+        while true {
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining <= 0 { throw SerialError.timeout("the reply to `\(line.prefix(20))`") }
+            let block = try readUntilPrompt(timeout: remaining)
+            if let echo = block.lastIndex(where: { $0.hasSuffix(line) }) {
+                lines = Array(block[(echo + 1)...])
+                break
+            }
+        }
         // The shell refuses `hostauth` while an app is open (it takes the loader
         // lock, so it never competes with an app for memory)
         if lines.contains(where: { $0.contains("cannot be run while an application is open") }) {
