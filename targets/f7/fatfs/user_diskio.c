@@ -34,12 +34,11 @@ static DSTATUS driver_initialize(BYTE pdrv) {
   */
 static DSTATUS driver_status(BYTE pdrv) {
     UNUSED(pdrv);
-    DSTATUS status = 0;
-    if(furi_hal_sd_get_card_state() != FuriStatusOk) {
-        status = STA_NOINIT;
-    }
-
-    return status;
+    // FatFS calls this before every file operation. Asking the card over SPI
+    // (CMD13) each time costs a bus round trip per call; card removal is
+    // already polled by the storage service, and real I/O errors still come
+    // back from read and write, so the card-detect pin is enough here.
+    return furi_hal_sd_is_present() ? 0 : STA_NOINIT;
 }
 
 /**

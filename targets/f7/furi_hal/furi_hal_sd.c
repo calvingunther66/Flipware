@@ -690,16 +690,20 @@ static FuriStatus
     uint32_t block_address = address;
     uint32_t offset = 0;
 
-    // CMD16 (SET_BLOCKLEN): R1 response (0x00: no errors)
-    SdSpiCmdAnswer response =
-        sd_spi_send_cmd(SD_CMD16_SET_BLOCKLEN, SD_BLOCK_SIZE, 0xFF, SdSpiCmdAnswerTypeR1);
-    sd_spi_deselect_card_and_purge();
+    SdSpiCmdAnswer response;
 
-    if(response.r1 != SdSpi_R1_NO_ERROR) {
-        return FuriStatusError;
-    }
-
+    // SDHC/SDXC cards have a fixed 512-byte block, so CMD16 is only needed
+    // (and only meaningful) for standard-capacity cards.
     if(!sd_high_capacity) {
+        // CMD16 (SET_BLOCKLEN): R1 response (0x00: no errors)
+        response =
+            sd_spi_send_cmd(SD_CMD16_SET_BLOCKLEN, SD_BLOCK_SIZE, 0xFF, SdSpiCmdAnswerTypeR1);
+        sd_spi_deselect_card_and_purge();
+
+        if(response.r1 != SdSpi_R1_NO_ERROR) {
+            return FuriStatusError;
+        }
+
         block_address = address * SD_BLOCK_SIZE;
     }
 
@@ -747,16 +751,20 @@ static FuriStatus sd_spi_cmd_write_blocks(
     uint32_t block_address = address;
     uint32_t offset = 0;
 
-    // CMD16 (SET_BLOCKLEN): R1 response (0x00: no errors)
-    SdSpiCmdAnswer response =
-        sd_spi_send_cmd(SD_CMD16_SET_BLOCKLEN, SD_BLOCK_SIZE, 0xFF, SdSpiCmdAnswerTypeR1);
-    sd_spi_deselect_card_and_purge();
+    SdSpiCmdAnswer response;
 
-    if(response.r1 != SdSpi_R1_NO_ERROR) {
-        return FuriStatusError;
-    }
-
+    // SDHC/SDXC cards have a fixed 512-byte block, so CMD16 is only needed
+    // (and only meaningful) for standard-capacity cards.
     if(!sd_high_capacity) {
+        // CMD16 (SET_BLOCKLEN): R1 response (0x00: no errors)
+        response =
+            sd_spi_send_cmd(SD_CMD16_SET_BLOCKLEN, SD_BLOCK_SIZE, 0xFF, SdSpiCmdAnswerTypeR1);
+        sd_spi_deselect_card_and_purge();
+
+        if(response.r1 != SdSpi_R1_NO_ERROR) {
+            return FuriStatusError;
+        }
+
         block_address = address * SD_BLOCK_SIZE;
     }
 
@@ -843,19 +851,10 @@ static FuriStatus sd_device_read(uint32_t* buff, uint32_t sector, uint32_t count
     furi_hal_spi_acquire(&furi_hal_spi_bus_handle_sd_fast);
     furi_hal_sd_spi_handle = &furi_hal_spi_bus_handle_sd_fast;
 
-    if(sd_spi_cmd_read_blocks(buff, sector, count, SD_TIMEOUT_MS) == FuriStatusOk) {
-        FuriHalCortexTimer timer = furi_hal_cortex_timer_get(SD_TIMEOUT_MS * 1000);
-
-        /* wait until the read operation is finished */
-        do {
-            status = sd_spi_get_card_state();
-
-            if(furi_hal_cortex_timer_is_expired(timer)) {
-                status = FuriStatusErrorTimeout;
-                break;
-            }
-        } while(status != FuriStatusOk);
-    }
+    // A read is complete once its data blocks have been received: the card
+    // reports read errors with an error token instead of the start token, so
+    // there is nothing left to poll for (unlike writes, which program later).
+    status = sd_spi_cmd_read_blocks(buff, sector, count, SD_TIMEOUT_MS);
 
     furi_hal_sd_spi_handle = NULL;
     furi_hal_spi_release(&furi_hal_spi_bus_handle_sd_fast);
