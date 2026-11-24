@@ -22,6 +22,12 @@ bool expansion_is_module_present(void) {
     return expansion_module_present;
 }
 
+// Overrides the weak default in furi_hal_sd.c: SD read/write retries must not
+// power-cycle the card (and so ext3.3V) while a module is attached.
+bool furi_hal_sd_power_reset_allowed(void) {
+    return !expansion_module_present;
+}
+
 typedef enum {
     ExpansionStateDisabled,
     ExpansionStateEnabled,
