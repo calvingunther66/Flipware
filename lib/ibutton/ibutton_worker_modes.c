@@ -145,7 +145,9 @@ static void ibutton_worker_write_set_target(iButtonWriteTarget target, void* con
     iButtonWorker* worker = context;
 
     worker->write_target = target;
-    if(!worker->write_cb) return;
+    // An app built before write targets existed has never heard of this result and may take
+    // it for a failed write, so it only goes to apps that opted in.
+    if(!worker->write_cb || !worker->write_targets_opted_in) return;
 
     ibutton_worker_write_report(worker, iButtonWorkerWriteStartTarget);
     // The next attempt masks the scheduler for most of a second, so the app and GUI threads

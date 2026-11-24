@@ -38,6 +38,7 @@ iButtonWorker* ibutton_worker_alloc(iButtonProtocols* protocols);
 /**
  * Limit which blank types a write may try. A worker starts at
  * ibutton_write_targets_default(), so honouring the user's setting is opt-in.
+ * Calling this also opts in to iButtonWorkerWriteStartTarget progress results.
  * @param worker
  * @param mask mask of iButtonWriteTarget bits
  */

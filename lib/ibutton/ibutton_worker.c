@@ -43,6 +43,7 @@ void ibutton_worker_set_write_targets(iButtonWorker* worker, iButtonWriteTargetM
     furi_check(worker);
 
     worker->write_target_mask = mask & IBUTTON_WRITE_TARGET_MASK_ALL;
+    worker->write_targets_opted_in = true;
 }
 
 const char* ibutton_worker_get_write_chip_name(iButtonWorker* worker) {
