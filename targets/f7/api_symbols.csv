@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,87.3,,
+Version,+,87.4,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/main/archive/helpers/archive_helpers_ext.h,,
 Header,+,applications/services/applications.h,,
@@ -66,7 +66,9 @@ Header,+,lib/flipper_format/flipper_format_i.h,,
 Header,+,lib/flipper_format/flipper_format_stream.h,,
 Header,+,lib/ibutton/ibutton_key.h,,
 Header,+,lib/ibutton/ibutton_protocols.h,,
+Header,+,lib/ibutton/ibutton_settings.h,,
 Header,+,lib/ibutton/ibutton_worker.h,,
+Header,+,lib/ibutton/ibutton_write_targets.h,,
 Header,+,lib/ieee754_parse_wrap/wrappers.h,,
 Header,+,lib/infrared/encoder_decoder/infrared.h,,
 Header,+,lib/infrared/signal/infrared_brute_force.h,,
@@ -77,7 +79,9 @@ Header,+,lib/infrared/worker/infrared_worker.h,,
 Header,+,lib/lfrfid/lfrfid_dict_file.h,,
 Header,+,lib/lfrfid/lfrfid_raw_file.h,,
 Header,+,lib/lfrfid/lfrfid_raw_worker.h,,
+Header,+,lib/lfrfid/lfrfid_settings.h,,
 Header,+,lib/lfrfid/lfrfid_worker.h,,
+Header,+,lib/lfrfid/lfrfid_write_targets.h,,
 Header,+,lib/lfrfid/protocols/lfrfid_protocols.h,,
 Header,+,lib/libusb_stm32/inc/hid_usage_button.h,,
 Header,+,lib/libusb_stm32/inc/hid_usage_consumer.h,,
@@ -2118,6 +2122,7 @@ Function,+,ibutton_protocols_get_manufacturer,const char*,"iButtonProtocols*, iB
 Function,+,ibutton_protocols_get_max_data_size,size_t,iButtonProtocols*
 Function,+,ibutton_protocols_get_name,const char*,"iButtonProtocols*, iButtonProtocolId"
 Function,+,ibutton_protocols_get_protocol_count,uint32_t,
+Function,-,ibutton_protocols_get_write_targets,iButtonWriteTargetMask,"iButtonProtocols*, iButtonKey*"
 Function,+,ibutton_protocols_is_valid,_Bool,"iButtonProtocols*, const iButtonKey*"
 Function,+,ibutton_protocols_load,_Bool,"iButtonProtocols*, iButtonKey*, const char*"
 Function,+,ibutton_protocols_read,_Bool,"iButtonProtocols*, iButtonKey*"
@@ -2128,18 +2133,26 @@ Function,+,ibutton_protocols_render_uid,void,"iButtonProtocols*, const iButtonKe
 Function,+,ibutton_protocols_save,_Bool,"iButtonProtocols*, const iButtonKey*, const char*"
 Function,+,ibutton_protocols_write_copy,_Bool,"iButtonProtocols*, iButtonKey*"
 Function,+,ibutton_protocols_write_id,_Bool,"iButtonProtocols*, iButtonKey*"
+Function,-,ibutton_protocols_write_id_targets,_Bool,"iButtonProtocols*, iButtonKey*, const iButtonWriteTargetContext*"
+Function,+,ibutton_settings_get_write_targets,iButtonWriteTargetMask,
+Function,+,ibutton_settings_set_write_targets,_Bool,iButtonWriteTargetMask
 Function,+,ibutton_worker_alloc,iButtonWorker*,iButtonProtocols*
 Function,+,ibutton_worker_emulate_set_callback,void,"iButtonWorker*, iButtonWorkerEmulateCallback, void*"
 Function,+,ibutton_worker_emulate_start,void,"iButtonWorker*, iButtonKey*"
 Function,+,ibutton_worker_free,void,iButtonWorker*
+Function,+,ibutton_worker_get_write_chip_name,const char*,iButtonWorker*
 Function,+,ibutton_worker_read_set_callback,void,"iButtonWorker*, iButtonWorkerReadCallback, void*"
 Function,+,ibutton_worker_read_start,void,"iButtonWorker*, iButtonKey*"
+Function,+,ibutton_worker_set_write_targets,void,"iButtonWorker*, iButtonWriteTargetMask"
 Function,+,ibutton_worker_start_thread,void,iButtonWorker*
 Function,+,ibutton_worker_stop,void,iButtonWorker*
 Function,+,ibutton_worker_stop_thread,void,iButtonWorker*
 Function,+,ibutton_worker_write_copy_start,void,"iButtonWorker*, iButtonKey*"
 Function,+,ibutton_worker_write_id_start,void,"iButtonWorker*, iButtonKey*"
 Function,+,ibutton_worker_write_set_callback,void,"iButtonWorker*, iButtonWorkerWriteCallback, void*"
+Function,+,ibutton_write_target_name,const char*,iButtonWriteTarget
+Function,-,ibutton_write_target_write,_Bool,"OneWireHost*, iButtonWriteTarget, const uint8_t*, size_t"
+Function,-,ibutton_write_targets_default,iButtonWriteTargetMask,
 Function,+,icon_animation_alloc,IconAnimation*,const Icon*
 Function,+,icon_animation_free,void,IconAnimation*
 Function,+,icon_animation_get_height,uint8_t,const IconAnimation*
@@ -2423,17 +2436,24 @@ Function,+,lfrfid_raw_worker_free,void,LFRFIDRawWorker*
 Function,+,lfrfid_raw_worker_start_emulate,void,"LFRFIDRawWorker*, const char*, LFRFIDWorkerEmulateRawCallback, void*"
 Function,+,lfrfid_raw_worker_start_read,void,"LFRFIDRawWorker*, const char*, float, float, LFRFIDWorkerReadRawCallback, void*"
 Function,+,lfrfid_raw_worker_stop,void,LFRFIDRawWorker*
+Function,+,lfrfid_settings_get_write_targets,LFRFIDWriteTargetMask,
+Function,+,lfrfid_settings_set_write_targets,_Bool,LFRFIDWriteTargetMask
 Function,+,lfrfid_worker_alloc,LFRFIDWorker*,ProtocolDict*
 Function,+,lfrfid_worker_emulate_raw_start,void,"LFRFIDWorker*, const char*, LFRFIDWorkerEmulateRawCallback, void*"
 Function,+,lfrfid_worker_emulate_start,void,"LFRFIDWorker*, LFRFIDProtocol"
 Function,+,lfrfid_worker_free,void,LFRFIDWorker*
 Function,+,lfrfid_worker_read_raw_start,void,"LFRFIDWorker*, const char*, LFRFIDWorkerReadType, LFRFIDWorkerReadRawCallback, void*"
 Function,+,lfrfid_worker_read_start,void,"LFRFIDWorker*, LFRFIDWorkerReadType, LFRFIDWorkerReadCallback, void*"
+Function,+,lfrfid_worker_set_write_targets,void,"LFRFIDWorker*, LFRFIDWriteTargetMask"
 Function,+,lfrfid_worker_start_thread,void,LFRFIDWorker*
 Function,+,lfrfid_worker_stop,void,LFRFIDWorker*
 Function,+,lfrfid_worker_stop_thread,void,LFRFIDWorker*
 Function,+,lfrfid_worker_write_and_set_pass_start,void,"LFRFIDWorker*, LFRFIDProtocol, LFRFIDWorkerWriteCallback, void*"
 Function,+,lfrfid_worker_write_start,void,"LFRFIDWorker*, LFRFIDProtocol, LFRFIDWorkerWriteCallback, void*"
+Function,+,lfrfid_write_target_name,const char*,LFRFIDWriteTarget
+Function,-,lfrfid_write_target_type,LFRFIDWriteType,LFRFIDWriteTarget
+Function,-,lfrfid_write_targets_default,LFRFIDWriteTargetMask,
+Function,+,lfrfid_write_targets_supported,LFRFIDWriteTargetMask,"ProtocolDict*, ProtocolId"
 Function,-,lgamma,double,double
 Function,-,lgamma_r,double,"double, int*"
 Function,-,lgammaf,float,float
