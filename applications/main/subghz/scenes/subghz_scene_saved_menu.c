@@ -4,6 +4,7 @@ enum SubmenuIndex {
     SubmenuIndexEmulate,
     SubmenuIndexEdit,
     SubmenuIndexDelete,
+    SubmenuIndexCompare,
     SubmenuIndexGeo,
     SubmenuIndexSignalSettings,
 };
@@ -33,6 +34,13 @@ void subghz_scene_saved_menu_on_enter(void* context) {
         subghz->submenu,
         "Delete",
         SubmenuIndexDelete,
+        subghz_scene_saved_menu_submenu_callback,
+        subghz);
+
+    submenu_add_item(
+        subghz->submenu,
+        "Compare with...",
+        SubmenuIndexCompare,
         subghz_scene_saved_menu_submenu_callback,
         subghz);
 
@@ -75,6 +83,9 @@ bool subghz_scene_saved_menu_on_event(void* context, SceneManagerEvent event) {
             return true;
         } else if(event.event == SubmenuIndexDelete) {
             scene_manager_next_scene(subghz->scene_manager, SubGhzSceneDelete);
+            return true;
+        } else if(event.event == SubmenuIndexCompare) {
+            scene_manager_next_scene(subghz->scene_manager, SubGhzSceneCompare);
             return true;
         } else if(event.event == SubmenuIndexEdit) {
             scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSaveName);

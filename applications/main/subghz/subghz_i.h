@@ -8,6 +8,7 @@
 #include "views/transmitter.h"
 #include "views/subghz_frequency_analyzer.h"
 #include "views/subghz_read_raw.h"
+#include "views/subghz_compare.h"
 
 #include <gui/gui.h>
 #include <assets_icons.h>
@@ -73,6 +74,7 @@ struct SubGhz {
 
     SubGhzFrequencyAnalyzer* subghz_frequency_analyzer;
     SubGhzReadRAW* subghz_read_raw;
+    SubGhzViewCompare* subghz_compare;
     bool raw_send_only;
 
     bool save_datetime_set;
