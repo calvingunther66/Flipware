@@ -441,13 +441,29 @@ static bool notification_save_settings(NotificationApp* app) {
         NOTIFICATION_SETTINGS_VERSION);
 }
 
+// Runs on the input thread. While a long sequence plays the queue can fill;
+// an unbounded wait would then stall every key event in the system. Each key
+// press sends this again, so a dropped one is retried by the next event.
+#define NOTIFICATION_INPUT_BACKLIGHT_TIMEOUT_MS (100U)
+
+static void notification_input_backlight_on(NotificationApp* app) {
+    NotificationAppMessage m = {
+        .type = NotificationLayerMessage,
+        .sequence = &sequence_display_backlight_on,
+        .back_event = NULL};
+    if(furi_message_queue_put(app->queue, &m, NOTIFICATION_INPUT_BACKLIGHT_TIMEOUT_MS) !=
+       FuriStatusOk) {
+        FURI_LOG_D(TAG, "Queue full, backlight-on dropped");
+    }
+}
+
 static void input_event_callback(const void* value, void* context) {
     furi_assert(value);
     furi_assert(context);
     const InputEvent* event = value;
     NotificationApp* app = context;
     if(event->sequence_source == INPUT_SEQUENCE_SOURCE_HARDWARE) {
-        notification_message(app, &sequence_display_backlight_on);
+        notification_input_backlight_on(app);
     }
 }
 
@@ -456,7 +472,7 @@ static void ascii_event_callback(const void* value, void* context) {
     furi_assert(context);
     UNUSED(value);
     NotificationApp* app = context;
-    notification_message(app, &sequence_display_backlight_on);
+    notification_input_backlight_on(app);
 }
 
 // App alloc
