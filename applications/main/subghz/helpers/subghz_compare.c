@@ -93,7 +93,8 @@ void subghz_compare_run(
     bool prev_differs = false;
 
     for(uint16_t i = 0; i < compared; i++) {
-        bool differs = subghz_compare_capture_get_bit(a, i) != subghz_compare_capture_get_bit(b, i);
+        bool differs = subghz_compare_capture_get_bit(a, i) !=
+                       subghz_compare_capture_get_bit(b, i);
         if(differs) {
             subghz_compare_set_bit(result->diff_mask, i, true);
             result->diff_bits++;
@@ -138,10 +139,7 @@ char subghz_compare_nibble_char(const SubGhzCompareCapture* capture, uint16_t ni
     return hex[value];
 }
 
-bool subghz_compare_nibble_differs(
-    const SubGhzCompareResult* result,
-    uint8_t pad,
-    uint16_t nibble) {
+bool subghz_compare_nibble_differs(const SubGhzCompareResult* result, uint8_t pad, uint16_t nibble) {
     for(uint8_t i = 0; i < 4; i++) {
         int32_t index = (int32_t)nibble * 4 + i - pad;
         if(index >= 0 && subghz_compare_result_bit_differs(result, (uint16_t)index)) {

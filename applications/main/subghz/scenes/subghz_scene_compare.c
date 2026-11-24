@@ -119,8 +119,7 @@ static void subghz_scene_compare_show(SubGhz* subghz, const char* path_b) {
     } else if(!subghz_scene_compare_load(storage, path_b, &data->b, err)) {
         furi_string_cat_printf(err, "\nin %s", furi_string_get_cstr(name_b));
         subghz_view_compare_set_error(subghz->subghz_compare, furi_string_get_cstr(err));
-    } else if(
-        data->a.kind == SubGhzCompareKindRaw || data->b.kind == SubGhzCompareKindRaw) {
+    } else if(data->a.kind == SubGhzCompareKindRaw || data->b.kind == SubGhzCompareKindRaw) {
         subghz_view_compare_set_error(
             subghz->subghz_compare,
             "RAW captures can't be\n"

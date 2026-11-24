@@ -111,10 +111,7 @@ char subghz_compare_nibble_char(const SubGhzCompareCapture* capture, uint16_t ni
  * True when any real bit inside nibble index differs. pad is the padding of
  * the capture the nibbles are drawn for (normally capture A).
  */
-bool subghz_compare_nibble_differs(
-    const SubGhzCompareResult* result,
-    uint8_t pad,
-    uint16_t nibble);
+bool subghz_compare_nibble_differs(const SubGhzCompareResult* result, uint8_t pad, uint16_t nibble);
 
 #ifdef __cplusplus
 }

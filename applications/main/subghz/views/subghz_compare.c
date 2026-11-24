@@ -48,7 +48,8 @@ static uint16_t subghz_view_compare_total_rows(const SubGhzViewCompareModel* mod
     return (cells + CELLS_PER_ROW - 1) / CELLS_PER_ROW;
 }
 
-static void subghz_view_compare_draw_cell(Canvas* canvas, int32_t x, int32_t y, char c, bool mark) {
+static void
+    subghz_view_compare_draw_cell(Canvas* canvas, int32_t x, int32_t y, char c, bool mark) {
     char str[2] = {c, 0};
     if(mark) {
         canvas_set_color(canvas, ColorBlack);
@@ -189,8 +190,7 @@ static bool subghz_view_compare_input(InputEvent* event, void* context) {
                 uint16_t total_rows = subghz_view_compare_total_rows(model);
                 if(event->key == InputKeyUp && model->row_offset > 0) {
                     model->row_offset--;
-                } else if(
-                    event->key == InputKeyDown && model->row_offset + ROWS_VISIBLE < total_rows) {
+                } else if(event->key == InputKeyDown && model->row_offset + ROWS_VISIBLE < total_rows) {
                     model->row_offset++;
                 } else if(event->key == InputKeyLeft) {
                     model->page = SubGhzCompareViewPageSummary;
@@ -275,8 +275,7 @@ void subghz_view_compare_set_result(
                 subghz_view_compare_add_line(model, "Protocols differ!");
                 subghz_view_compare_add_line(model, "%s vs %s", a->protocol, b->protocol);
             } else {
-                subghz_view_compare_add_line(
-                    model, "%s, %u bits", a->protocol, a->declared_bits);
+                subghz_view_compare_add_line(model, "%s, %u bits", a->protocol, a->declared_bits);
             }
             subghz_view_compare_add_line(model, "A: %s", name_a);
             subghz_view_compare_add_line(model, "B: %s", name_b);

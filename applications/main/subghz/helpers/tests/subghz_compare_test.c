@@ -17,13 +17,13 @@
 static int failures = 0;
 static int checks = 0;
 
-#define CHECK(cond)                                                    \
-    do {                                                               \
-        checks++;                                                      \
-        if(!(cond)) {                                                  \
-            failures++;                                                \
+#define CHECK(cond)                                                \
+    do {                                                           \
+        checks++;                                                  \
+        if(!(cond)) {                                              \
+            failures++;                                            \
             printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond); \
-        }                                                              \
+        }                                                          \
     } while(0)
 
 static void key_capture(
