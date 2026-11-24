@@ -21,7 +21,7 @@
 // chain - a real stack watermark warning (248 bytes free) was observed at
 // 768, immediately followed by the worker repeatedly restarting. Bumped
 // with real headroom rather than the minimum that clears the warning.
-#define EXPANSION_WORKER_STACK_SZIE  (2048UL)
+#define EXPANSION_WORKER_STACK_SZIE (2048UL)
 // RX staging buffer between the UART DMA callback (IRQ) and the worker
 // thread. It used to hold exactly one encoded frame, so any burst bigger than
 // one frame (e.g. a STATUS ack immediately followed by the next DATA/COPROC
@@ -32,7 +32,7 @@
     (8UL * (sizeof(ExpansionFrame) + sizeof(ExpansionFrameChecksum)))
 // Bytes copied out of the HAL DMA ring per step inside the IRQ callback. Kept
 // small because it lives on the interrupt stack.
-#define EXPANSION_WORKER_DMA_CHUNK_SIZE (32UL)
+#define EXPANSION_WORKER_DMA_CHUNK_SIZE       (32UL)
 // Granularity at which a blocked coproc sender notices the worker has exited.
 #define EXPANSION_WORKER_COPROC_WAIT_SLICE_MS (50UL)
 
@@ -65,7 +65,7 @@ typedef enum {
     ExpansionWorkerFlagCoprocTx = 1 << 3,
 } ExpansionWorkerFlag;
 
-#define EXPANSION_ALL_FLAGS                                                       \
+#define EXPANSION_ALL_FLAGS                                                         \
     (ExpansionWorkerFlagData | ExpansionWorkerFlagStop | ExpansionWorkerFlagError | \
      ExpansionWorkerFlagCoprocTx)
 
@@ -185,8 +185,8 @@ static void expansion_worker_serial_rx_dma_callback(
         bool dropped = false;
 
         while(size) {
-            const size_t got = furi_hal_serial_dma_rx(
-                handle, chunk, size > sizeof(chunk) ? sizeof(chunk) : size);
+            const size_t got =
+                furi_hal_serial_dma_rx(handle, chunk, size > sizeof(chunk) ? sizeof(chunk) : size);
             if(got == 0) break;
             size -= got;
             const size_t sent = furi_stream_buffer_send(instance->rx_buf, chunk, got, 0);
@@ -251,12 +251,11 @@ static void expansion_worker_service_coproc_tx(ExpansionWorker* instance) {
     instance->coproc_tx_active = req;
     instance->coproc_tx_chunk_next = 0;
     instance->coproc_tx_chunk_sent = false;
-    instance->coproc_tx_chunk_total = req->data_size == 0 ?
-                                           1 :
-                                           (uint16_t)((req->data_size +
-                                                        EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE -
-                                                        1) /
-                                                       EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE);
+    instance->coproc_tx_chunk_total =
+        req->data_size == 0 ?
+            1 :
+            (uint16_t)((req->data_size + EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE - 1) /
+                       EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE);
 
     expansion_worker_attempt_coproc_chunk(instance);
 }
@@ -369,9 +368,9 @@ static inline bool
     // here concurrently with the worker's own thread's ACK/heartbeat sends -
     // serialize actual UART writes so frames never interleave on the wire.
     furi_mutex_acquire(instance->tx_mutex, FuriWaitForever);
-    const bool success = expansion_protocol_encode(
-                              frame, expansion_worker_send_callback, instance) ==
-                          ExpansionProtocolStatusOk;
+    const bool success =
+        expansion_protocol_encode(frame, expansion_worker_send_callback, instance) ==
+        ExpansionProtocolStatusOk;
     furi_mutex_release(instance->tx_mutex);
     return success;
 }
@@ -505,8 +504,9 @@ static void expansion_worker_coproc_rx_release(ExpansionWorker* instance) {
     instance->coproc_rx_len = 0;
 }
 
-static bool
-    expansion_worker_handle_coproc_frame(ExpansionWorker* instance, const ExpansionFrame* rx_frame) {
+static bool expansion_worker_handle_coproc_frame(
+    ExpansionWorker* instance,
+    const ExpansionFrame* rx_frame) {
     const ExpansionFrameCoproc* coproc = &rx_frame->content.coproc;
     ExpansionFrameError ack_error = ExpansionFrameErrorNone;
 
@@ -519,8 +519,8 @@ static bool
             instance->coproc_rx_len = 0;
             // NAK instead of crashing when RAM is short: the job's caller
             // then falls back to computing the result locally.
-            if(!instance->coproc_rx_buf &&
-               memmgr_heap_get_max_free_block() >= EXPANSION_WORKER_COPROC_MAX_MESSAGE_SIZE + 512) {
+            if(!instance->coproc_rx_buf && memmgr_heap_get_max_free_block() >=
+                                               EXPANSION_WORKER_COPROC_MAX_MESSAGE_SIZE + 512) {
                 instance->coproc_rx_buf = malloc(EXPANSION_WORKER_COPROC_MAX_MESSAGE_SIZE);
             }
         }
@@ -904,18 +904,19 @@ bool expansion_worker_coproc_send(
         // budget - a timeout here should only happen if the worker thread is
         // wedged elsewhere, a condition this whole redesign exists to
         // eliminate.
-        const uint32_t chunk_total = data_size == 0 ?
-                                          1 :
-                                          (uint32_t)((data_size +
-                                                       EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE - 1) /
-                                                      EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE);
+        const uint32_t chunk_total =
+            data_size == 0 ?
+                1 :
+                (uint32_t)((data_size + EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE - 1) /
+                           EXPANSION_PROTOCOL_COPROC_MAX_PAYLOAD_SIZE);
         const uint32_t wait_ms = EXPANSION_PROTOCOL_TIMEOUT_MS * (chunk_total + 2);
         // Wait in slices so a worker that exits after we queued (link lost)
         // ends the wait at once instead of after the whole budget.
         FuriStatus done_status = FuriStatusErrorTimeout;
-        for(uint32_t waited = 0; waited < wait_ms; waited += EXPANSION_WORKER_COPROC_WAIT_SLICE_MS) {
-            done_status =
-                furi_semaphore_acquire(req.done, furi_ms_to_ticks(EXPANSION_WORKER_COPROC_WAIT_SLICE_MS));
+        for(uint32_t waited = 0; waited < wait_ms;
+            waited += EXPANSION_WORKER_COPROC_WAIT_SLICE_MS) {
+            done_status = furi_semaphore_acquire(
+                req.done, furi_ms_to_ticks(EXPANSION_WORKER_COPROC_WAIT_SLICE_MS));
             if(done_status == FuriStatusOk || instance->coproc_tx_closed) break;
         }
         if(done_status != FuriStatusOk) done_status = furi_semaphore_acquire(req.done, 0);
