@@ -16,6 +16,7 @@ typedef enum {
     DesktopSettingsCustomEventSetPin,
     DesktopSettingsCustomEventChangePin,
     DesktopSettingsCustomEventDisablePin,
+    DesktopSettingsCustomEventForgetHosts,
 } DesktopSettingsCustomEvent;
 
 #ifdef __cplusplus
