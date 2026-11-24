@@ -96,6 +96,8 @@ struct ArchiveBrowserView {
     FuriTimer* scroll_timer;
     File* disk_image;
     const char* override_home_path;
+    // Name of the selected item while the list is freed for a launched app
+    FuriString* resume_name;
 };
 
 typedef struct {

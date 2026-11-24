@@ -93,9 +93,11 @@ static FuriString*
     desktop_keybinds_load_one(Desktop* desktop, DesktopKeybindType type, DesktopKeybindKey key) {
     bool success = false;
     FuriString* keybind = furi_string_alloc();
-    FlipperFormat* file = flipper_format_file_alloc(desktop->storage);
+    // Buffered: the file is small, so one read replaces dozens of 32-byte
+    // ones. This runs on every desktop arrow press.
+    FlipperFormat* file = flipper_format_buffered_file_alloc(desktop->storage);
 
-    if(flipper_format_file_open_existing(file, DESKTOP_KEYBINDS_PATH)) {
+    if(flipper_format_buffered_file_open_existing(file, DESKTOP_KEYBINDS_PATH)) {
         FuriString* keybind_name = furi_string_alloc_printf(
             "%s%s", desktop_keybind_types[type], desktop_keybind_keys[key]);
         success = flipper_format_read_string(file, furi_string_get_cstr(keybind_name), keybind);
@@ -122,10 +124,10 @@ void desktop_keybinds_load(Desktop* desktop, DesktopKeybinds* keybinds) {
         }
     }
 
-    FlipperFormat* file = flipper_format_file_alloc(desktop->storage);
+    FlipperFormat* file = flipper_format_buffered_file_alloc(desktop->storage);
     FuriString* keybind_name = furi_string_alloc();
 
-    if(flipper_format_file_open_existing(file, DESKTOP_KEYBINDS_PATH)) {
+    if(flipper_format_buffered_file_open_existing(file, DESKTOP_KEYBINDS_PATH)) {
         for(DesktopKeybindType type = 0; type < DesktopKeybindTypeMAX; type++) {
             for(DesktopKeybindKey key = 0; key < DesktopKeybindKeyMAX; key++) {
                 furi_string_printf(

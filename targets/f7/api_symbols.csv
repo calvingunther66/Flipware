@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,87.1,,
+Version,+,87.2,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/main/archive/helpers/archive_helpers_ext.h,,
 Header,+,applications/services/applications.h,,
@@ -1619,6 +1619,7 @@ Function,+,furi_hal_power_enable_otg,_Bool,
 Function,+,furi_hal_power_gauge_is_ok,_Bool,
 Function,+,furi_hal_power_get_bat_health_pct,uint8_t,
 Function,+,furi_hal_power_get_battery_charge_voltage_limit,float,
+Function,+,furi_hal_power_get_battery_cycle_count,uint16_t,
 Function,+,furi_hal_power_get_battery_current,float,FuriHalPowerIC
 Function,+,furi_hal_power_get_battery_design_capacity,uint32_t,
 Function,+,furi_hal_power_get_battery_full_capacity,uint32_t,
@@ -1730,6 +1731,7 @@ Function,+,furi_hal_sd_is_present,_Bool,
 Function,+,furi_hal_sd_max_mount_retry_count,uint8_t,
 Function,+,furi_hal_sd_presence_init,void,
 Function,+,furi_hal_sd_read_blocks,FuriStatus,"uint32_t*, uint32_t, uint32_t"
+Function,-,furi_hal_sd_set_power_reset_guard,void,FuriHalSdPowerResetGuard
 Function,+,furi_hal_sd_write_blocks,FuriStatus,"const uint32_t*, uint32_t, uint32_t"
 Function,+,furi_hal_serial_async_rx,uint8_t,FuriHalSerialHandle*
 Function,+,furi_hal_serial_async_rx_available,_Bool,FuriHalSerialHandle*
@@ -2163,7 +2165,9 @@ Function,-,infrared_brute_force_calculate_messages_ex,InfraredErrorCode,"Infrare
 Function,-,infrared_brute_force_free,void,InfraredBruteForce*
 Function,-,infrared_brute_force_get_button_count,size_t,const InfraredBruteForce*
 Function,-,infrared_brute_force_get_button_name,const char*,"const InfraredBruteForce*, size_t"
+Function,-,infrared_brute_force_get_current_record_name,const char*,const InfraredBruteForce*
 Function,-,infrared_brute_force_is_started,_Bool,const InfraredBruteForce*
+Function,-,infrared_brute_force_load_signal,_Bool,"InfraredBruteForce*, uint32_t, InfraredSignal*"
 Function,-,infrared_brute_force_reset,void,InfraredBruteForce*
 Function,-,infrared_brute_force_send,_Bool,"InfraredBruteForce*, uint32_t"
 Function,-,infrared_brute_force_set_db_filename,void,"InfraredBruteForce*, const char*"

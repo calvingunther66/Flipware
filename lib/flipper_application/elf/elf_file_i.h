@@ -21,7 +21,10 @@ struct ELFSection {
 
     size_t rel_count;
     Elf32_Off rel_offset;
-    ELFSection* fast_rel;
+
+    /* .fast.rel record stream, read from the file during relocation */
+    Elf32_Off fast_rel_offset;
+    Elf32_Word fast_rel_size;
 
     uint16_t sec_idx;
 };
@@ -32,6 +35,7 @@ struct ELFFile {
     size_t sections_count;
     off_t section_table;
     off_t section_table_strings;
+    size_t section_table_strings_size;
 
     size_t symbol_count;
     off_t symbol_table;
@@ -41,6 +45,8 @@ struct ELFFile {
 
     AddressCache_t relocation_cache;
     AddressCache_t trampoline_cache;
+    bool trampoline_cache_freed;
+    struct ELFTrampolineSlab* trampoline_slabs;
 
     File* fd;
     const ElfApiInterface* api_interface;

@@ -28,6 +28,11 @@ typedef enum {
     WorkerEvtConfigChange = (1 << 5),
 } WorkerEvtFlags;
 
+// Pending events that make a full folder load in progress pointless
+#define WORKER_FLAGS_CANCEL_LOAD                                                           \
+    (WorkerEvtStop | WorkerEvtFolderEnter | WorkerEvtFolderExit | WorkerEvtFolderRefresh | \
+     WorkerEvtConfigChange)
+
 #define WORKER_FLAGS_ALL                                                          \
     (WorkerEvtStop | WorkerEvtLoad | WorkerEvtFolderEnter | WorkerEvtFolderExit | \
      WorkerEvtFolderRefresh | WorkerEvtConfigChange)
@@ -327,8 +332,17 @@ static bool browser_folder_load_full(BrowserWorker* browser, FuriString* path) {
         if(browser->list_load_cb) {
             browser->list_load_cb(browser->cb_ctx, 0);
         }
+        bool cancelled = false;
         while(storage_dir_read(directory, &file_info, name_temp, FILE_NAME_LEN_MAX) &&
               storage_file_get_error(directory) == FSE_OK) {
+            // A folder change or stop is already queued: the list being built
+            // will be thrown away, so stop now instead of reading every
+            // remaining entry (each .fap costs a manifest read) before Back
+            // or a tab switch can take effect. The queued event reloads.
+            if(furi_thread_flags_get() & WORKER_FLAGS_CANCEL_LOAD) {
+                cancelled = true;
+                break;
+            }
             furi_string_set(name_str, name_temp);
             if(browser_filter_by_name(browser, name_str, file_info_is_dir(&file_info))) {
                 furi_string_printf(name_str, "%s/%s", furi_string_get_cstr(path), name_temp);
@@ -338,6 +352,10 @@ static bool browser_folder_load_full(BrowserWorker* browser, FuriString* path) {
                 }
                 items_cnt++;
             }
+        }
+        if(cancelled) {
+            FURI_LOG_D(TAG, "Load cancelled after %lu items", items_cnt);
+            break;
         }
         if(browser->list_item_cb) {
             browser->list_item_cb(browser->cb_ctx, NULL, false, true);

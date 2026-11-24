@@ -685,6 +685,7 @@ ArchiveBrowserView* browser_alloc(void) {
 
     browser->path = furi_string_alloc_set(archive_get_default_path(TAB_DEFAULT));
     browser->formatted_path = furi_string_alloc();
+    browser->resume_name = furi_string_alloc();
     browser->path_changed = true;
 
     with_view_model(
@@ -720,6 +721,7 @@ void browser_free(ArchiveBrowserView* browser) {
 
     furi_string_free(browser->path);
     furi_string_free(browser->formatted_path);
+    furi_string_free(browser->resume_name);
 
     view_free(browser->view);
     free(browser);

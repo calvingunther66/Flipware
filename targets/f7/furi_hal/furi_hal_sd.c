@@ -21,6 +21,7 @@
 #define FLAG_SET(x, y) (((x) & (y)) == (y))
 
 static bool sd_high_capacity = false;
+static volatile FuriHalSdPowerResetGuard sd_power_reset_guard = NULL;
 
 typedef enum {
     SdSpiDataResponceOK = 0x05,
@@ -378,9 +379,9 @@ static SdSpiCmdAnswer
         furi_delay_us(1000);
         sd_spi_deselect_card();
 
-        // and wait for it to be ready
-        while(sd_spi_read_byte() != 0xFF) {
-        };
+        // and wait for it to be ready, but not forever: the SPI bus (shared
+        // with the display) stays held while we wait
+        sd_spi_wait_for_data(0xFF, SD_TIMEOUT_MS);
 
         break;
     case SdSpiCmdAnswerTypeR2:
@@ -685,22 +686,79 @@ static FuriStatus sd_spi_get_cid(SD_CID* Cid) {
     return ret;
 }
 
+static void sd_spi_stop_transmission(uint32_t timeout_ms) {
+    // CMD12 (STOP_TRANSMISSION), sent while the card is still selected and
+    // streaming. The byte right after the command is a stuff byte; then the
+    // R1 response (MSB clear) follows, then busy (0x00) until the card is done.
+    uint8_t frame[SD_CMD_LENGTH] = {(uint8_t)SD_CMD12_STOP_TRANSMISSION | 0x40, 0, 0, 0, 0, 0xFF};
+    sd_spi_write_bytes(frame, sizeof(frame));
+    sd_spi_read_byte();
+
+    uint8_t retry = 10;
+    while((sd_spi_read_byte() & 0x80) && --retry) {
+    }
+
+    sd_spi_wait_for_data(0xFF, timeout_ms);
+}
+
+static FuriStatus sd_spi_cmd_read_multiple_blocks(
+    uint32_t* data,
+    uint32_t block_address,
+    uint32_t blocks,
+    uint32_t timeout_ms) {
+    // One CMD18 for the whole run instead of a CMD17 per 512-byte block:
+    // fewer commands and less time holding the shared SPI bus for large
+    // reads (app sections, big files).
+    SdSpiCmdAnswer response =
+        sd_spi_send_cmd(SD_CMD18_READ_MULT_BLOCK, block_address, 0xFF, SdSpiCmdAnswerTypeR1);
+    if(response.r1 != SdSpi_R1_NO_ERROR) {
+        sd_spi_deselect_card_and_purge();
+        return FuriStatusError;
+    }
+
+    FuriStatus status = FuriStatusOk;
+    uint32_t offset = 0;
+    while(blocks--) {
+        if(sd_spi_wait_for_data(SD_TOKEN_START_DATA_MULTIPLE_BLOCK_READ, timeout_ms) !=
+           FuriStatusOk) {
+            status = FuriStatusError;
+            break;
+        }
+        sd_spi_read_bytes_dma((uint8_t*)data + offset, SD_BLOCK_SIZE);
+        sd_spi_purge_crc();
+        offset += SD_BLOCK_SIZE;
+    }
+
+    sd_spi_stop_transmission(timeout_ms);
+    sd_spi_deselect_card_and_purge();
+
+    return status;
+}
+
 static FuriStatus
     sd_spi_cmd_read_blocks(uint32_t* data, uint32_t address, uint32_t blocks, uint32_t timeout_ms) {
     uint32_t block_address = address;
     uint32_t offset = 0;
 
-    // CMD16 (SET_BLOCKLEN): R1 response (0x00: no errors)
-    SdSpiCmdAnswer response =
-        sd_spi_send_cmd(SD_CMD16_SET_BLOCKLEN, SD_BLOCK_SIZE, 0xFF, SdSpiCmdAnswerTypeR1);
-    sd_spi_deselect_card_and_purge();
+    SdSpiCmdAnswer response;
 
-    if(response.r1 != SdSpi_R1_NO_ERROR) {
-        return FuriStatusError;
+    // SDHC/SDXC cards have a fixed 512-byte block, so CMD16 is only needed
+    // (and only meaningful) for standard-capacity cards.
+    if(!sd_high_capacity) {
+        // CMD16 (SET_BLOCKLEN): R1 response (0x00: no errors)
+        response =
+            sd_spi_send_cmd(SD_CMD16_SET_BLOCKLEN, SD_BLOCK_SIZE, 0xFF, SdSpiCmdAnswerTypeR1);
+        sd_spi_deselect_card_and_purge();
+
+        if(response.r1 != SdSpi_R1_NO_ERROR) {
+            return FuriStatusError;
+        }
+
+        block_address = address * SD_BLOCK_SIZE;
     }
 
-    if(!sd_high_capacity) {
-        block_address = address * SD_BLOCK_SIZE;
+    if(blocks > 1) {
+        return sd_spi_cmd_read_multiple_blocks(data, block_address, blocks, timeout_ms);
     }
 
     while(blocks--) {
@@ -739,6 +797,59 @@ static FuriStatus
     return FuriStatusOk;
 }
 
+static FuriStatus sd_spi_cmd_write_multiple_blocks(
+    const uint32_t* data,
+    uint32_t block_address,
+    uint32_t blocks,
+    uint32_t timeout_ms) {
+    // CMD25 (WRITE_MULT_BLOCK): one command, each block sent with the 0xFC
+    // token, then the 0xFD stop token. The card's completion is still checked
+    // by the CMD13 poll in sd_device_write.
+    SdSpiCmdAnswer response =
+        sd_spi_send_cmd(SD_CMD25_WRITE_MULT_BLOCK, block_address, 0xFF, SdSpiCmdAnswerTypeR1);
+    if(response.r1 != SdSpi_R1_NO_ERROR) {
+        sd_spi_deselect_card_and_purge();
+        return FuriStatusError;
+    }
+
+    // NWR: at least one byte between the response and the first data token
+    sd_spi_write_byte(SD_DUMMY_BYTE);
+
+    FuriStatus status = FuriStatusOk;
+    uint32_t offset = 0;
+    while(blocks--) {
+        sd_spi_write_byte(SD_TOKEN_START_DATA_MULTIPLE_BLOCK_WRITE);
+        sd_spi_write_bytes_dma((uint8_t*)data + offset, SD_BLOCK_SIZE);
+        sd_spi_purge_crc();
+
+        // Data response token: xxx0 0101 means accepted
+        uint8_t data_response = sd_spi_read_byte();
+        if((data_response & 0x1F) != SdSpiDataResponceOK) {
+            status = FuriStatusError;
+            break;
+        }
+
+        // Wait while the card programs the block
+        if(sd_spi_wait_for_data(0xFF, timeout_ms) != FuriStatusOk) {
+            status = FuriStatusError;
+            break;
+        }
+        offset += SD_BLOCK_SIZE;
+    }
+
+    // Always end the transfer, also after an error, so the card leaves the
+    // receive-data state
+    sd_spi_write_byte(SD_TOKEN_STOP_DATA_MULTIPLE_BLOCK_WRITE);
+    sd_spi_read_byte();
+    if(sd_spi_wait_for_data(0xFF, timeout_ms) != FuriStatusOk) {
+        status = FuriStatusError;
+    }
+
+    sd_spi_deselect_card_and_purge();
+
+    return status;
+}
+
 static FuriStatus sd_spi_cmd_write_blocks(
     const uint32_t* data,
     uint32_t address,
@@ -747,17 +858,25 @@ static FuriStatus sd_spi_cmd_write_blocks(
     uint32_t block_address = address;
     uint32_t offset = 0;
 
-    // CMD16 (SET_BLOCKLEN): R1 response (0x00: no errors)
-    SdSpiCmdAnswer response =
-        sd_spi_send_cmd(SD_CMD16_SET_BLOCKLEN, SD_BLOCK_SIZE, 0xFF, SdSpiCmdAnswerTypeR1);
-    sd_spi_deselect_card_and_purge();
+    SdSpiCmdAnswer response;
 
-    if(response.r1 != SdSpi_R1_NO_ERROR) {
-        return FuriStatusError;
+    // SDHC/SDXC cards have a fixed 512-byte block, so CMD16 is only needed
+    // (and only meaningful) for standard-capacity cards.
+    if(!sd_high_capacity) {
+        // CMD16 (SET_BLOCKLEN): R1 response (0x00: no errors)
+        response =
+            sd_spi_send_cmd(SD_CMD16_SET_BLOCKLEN, SD_BLOCK_SIZE, 0xFF, SdSpiCmdAnswerTypeR1);
+        sd_spi_deselect_card_and_purge();
+
+        if(response.r1 != SdSpi_R1_NO_ERROR) {
+            return FuriStatusError;
+        }
+
+        block_address = address * SD_BLOCK_SIZE;
     }
 
-    if(!sd_high_capacity) {
-        block_address = address * SD_BLOCK_SIZE;
+    if(blocks > 1) {
+        return sd_spi_cmd_write_multiple_blocks(data, block_address, blocks, timeout_ms);
     }
 
     while(blocks--) {
@@ -843,19 +962,10 @@ static FuriStatus sd_device_read(uint32_t* buff, uint32_t sector, uint32_t count
     furi_hal_spi_acquire(&furi_hal_spi_bus_handle_sd_fast);
     furi_hal_sd_spi_handle = &furi_hal_spi_bus_handle_sd_fast;
 
-    if(sd_spi_cmd_read_blocks(buff, sector, count, SD_TIMEOUT_MS) == FuriStatusOk) {
-        FuriHalCortexTimer timer = furi_hal_cortex_timer_get(SD_TIMEOUT_MS * 1000);
-
-        /* wait until the read operation is finished */
-        do {
-            status = sd_spi_get_card_state();
-
-            if(furi_hal_cortex_timer_is_expired(timer)) {
-                status = FuriStatusErrorTimeout;
-                break;
-            }
-        } while(status != FuriStatusOk);
-    }
+    // A read is complete once its data blocks have been received: the card
+    // reports read errors with an error token instead of the start token, so
+    // there is nothing left to poll for (unlike writes, which program later).
+    status = sd_spi_cmd_read_blocks(buff, sector, count, SD_TIMEOUT_MS);
 
     furi_hal_sd_spi_handle = NULL;
     furi_hal_spi_release(&furi_hal_spi_bus_handle_sd_fast);
@@ -971,6 +1081,19 @@ FuriStatus furi_hal_sd_get_card_state(void) {
     return status;
 }
 
+void furi_hal_sd_set_power_reset_guard(FuriHalSdPowerResetGuard guard) {
+    sd_power_reset_guard = guard;
+}
+
+// Even retry attempts power-cycle the card, unless the guard objects. The
+// last even attempt (counter == 2) always may, as a last resort.
+static bool sd_retry_power_reset(uint8_t counter) {
+    if((counter % 2) != 0) return false;
+    if(counter <= 2) return true;
+    FuriHalSdPowerResetGuard guard = sd_power_reset_guard;
+    return guard == NULL || guard();
+}
+
 FuriStatus furi_hal_sd_read_blocks(uint32_t* buff, uint32_t sector, uint32_t count) {
     furi_check(buff);
 
@@ -989,12 +1112,7 @@ FuriStatus furi_hal_sd_read_blocks(uint32_t* buff, uint32_t sector, uint32_t cou
         uint8_t counter = furi_hal_sd_max_mount_retry_count();
 
         while(status != FuriStatusOk && counter > 0 && furi_hal_sd_is_present()) {
-            if((counter % 2) == 0) {
-                // power reset sd card
-                status = furi_hal_sd_init(true);
-            } else {
-                status = furi_hal_sd_init(false);
-            }
+            status = furi_hal_sd_init(sd_retry_power_reset(counter));
 
             if(status == FuriStatusOk) {
                 status = sd_device_read(buff, sector, count);
@@ -1023,12 +1141,7 @@ FuriStatus furi_hal_sd_write_blocks(const uint32_t* buff, uint32_t sector, uint3
         uint8_t counter = furi_hal_sd_max_mount_retry_count();
 
         while(status != FuriStatusOk && counter > 0 && furi_hal_sd_is_present()) {
-            if((counter % 2) == 0) {
-                // power reset sd card
-                status = furi_hal_sd_init(true);
-            } else {
-                status = furi_hal_sd_init(false);
-            }
+            status = furi_hal_sd_init(sd_retry_power_reset(counter));
 
             if(status == FuriStatusOk) {
                 status = sd_device_write(buff, sector, count);

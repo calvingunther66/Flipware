@@ -145,7 +145,9 @@ struct ExpansionWorker {
     uint16_t coproc_rx_job_id;
     uint16_t coproc_rx_chunk_next;
     size_t coproc_rx_len;
-    uint8_t coproc_rx_buf[EXPANSION_WORKER_COPROC_MAX_MESSAGE_SIZE];
+    // Allocated while a coprocessor result is being reassembled, not for as
+    // long as a module is attached (the VGM stays attached all day).
+    uint8_t* coproc_rx_buf;
 
     ExpansionWorkerState state;
     ExpansionWorkerExitReason exit_reason;
@@ -496,6 +498,13 @@ static bool expansion_worker_handle_state_handshake(
 // out-of-sequence or oversized messages are dropped and NAK'd rather than
 // killing the connection. Request-flagged frames (module -> Flipper job
 // submission) are not supported in this version and are silently dropped.
+static void expansion_worker_coproc_rx_release(ExpansionWorker* instance) {
+    free(instance->coproc_rx_buf);
+    instance->coproc_rx_buf = NULL;
+    instance->coproc_rx_chunk_next = 0;
+    instance->coproc_rx_len = 0;
+}
+
 static bool
     expansion_worker_handle_coproc_frame(ExpansionWorker* instance, const ExpansionFrame* rx_frame) {
     const ExpansionFrameCoproc* coproc = &rx_frame->content.coproc;
@@ -508,13 +517,19 @@ static bool
             instance->coproc_rx_job_id = coproc->job_id;
             instance->coproc_rx_chunk_next = 0;
             instance->coproc_rx_len = 0;
+            // NAK instead of crashing when RAM is short: the job's caller
+            // then falls back to computing the result locally.
+            if(!instance->coproc_rx_buf &&
+               memmgr_heap_get_max_free_block() >= EXPANSION_WORKER_COPROC_MAX_MESSAGE_SIZE + 512) {
+                instance->coproc_rx_buf = malloc(EXPANSION_WORKER_COPROC_MAX_MESSAGE_SIZE);
+            }
         }
 
-        if(coproc->job_id != instance->coproc_rx_job_id ||
+        if(!instance->coproc_rx_buf || coproc->job_id != instance->coproc_rx_job_id ||
            coproc->chunk_seq != instance->coproc_rx_chunk_next ||
-           coproc->payload_len > sizeof(instance->coproc_rx_buf) - instance->coproc_rx_len) {
-            instance->coproc_rx_chunk_next = 0;
-            instance->coproc_rx_len = 0;
+           coproc->payload_len >
+               EXPANSION_WORKER_COPROC_MAX_MESSAGE_SIZE - instance->coproc_rx_len) {
+            expansion_worker_coproc_rx_release(instance);
             ack_error = ExpansionFrameErrorUnknown;
             break;
         }
@@ -535,8 +550,7 @@ static bool
                     instance->coproc_rx_buf,
                     instance->coproc_rx_len);
             }
-            instance->coproc_rx_chunk_next = 0;
-            instance->coproc_rx_len = 0;
+            expansion_worker_coproc_rx_release(instance);
         }
     } while(false);
 
@@ -763,6 +777,7 @@ ExpansionWorker* expansion_worker_alloc(FuriHalSerialId serial_id) {
     instance->coproc_rx_job_id = 0;
     instance->coproc_rx_chunk_next = 0;
     instance->coproc_rx_len = 0;
+    instance->coproc_rx_buf = NULL;
     instance->last_rx_error_event = 0;
 
     // Improves responsiveness in heavy games at the expense of dropped frames
@@ -777,6 +792,7 @@ void expansion_worker_free(ExpansionWorker* instance) {
     furi_thread_free(instance->thread);
     furi_mutex_free(instance->tx_mutex);
     furi_message_queue_free(instance->coproc_tx_queue);
+    free(instance->coproc_rx_buf);
     free(instance);
 }
 

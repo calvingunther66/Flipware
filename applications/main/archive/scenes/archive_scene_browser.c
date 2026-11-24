@@ -140,8 +140,36 @@ static void archive_mount_disk_image(ArchiveBrowserView* browser, ArchiveFile_t*
     furi_record_close(RECORD_STORAGE);
 }
 
+static void archive_run_in_app_internal(
+    ArchiveBrowserView* browser,
+    ArchiveFile_t* selected,
+    bool favorites,
+    LoaderStatus* status);
+
 static void
     archive_run_in_app(ArchiveBrowserView* browser, ArchiveFile_t* selected, bool favorites) {
+    const bool launches_app = selected->type != ArchiveFileTypeSearch &&
+                              selected->type != ArchiveFileTypeFolder;
+    LoaderStatus status = LoaderStatusOk;
+    archive_run_in_app_internal(browser, selected, favorites, &status);
+
+    // Archive stays open under the app it launched, and its list (up to 50
+    // items with names and icons) used to stay in RAM the whole time. The list
+    // is rebuilt when the app exits (ArchiveBrowserEventListRefresh), so free
+    // it now; if the launch failed right away, rebuild it immediately.
+    if(browser && launches_app) {
+        archive_release_list(browser);
+        if(status != LoaderStatusOk) {
+            browser->callback(ArchiveBrowserEventListRefresh, browser->context);
+        }
+    }
+}
+
+static void archive_run_in_app_internal(
+    ArchiveBrowserView* browser,
+    ArchiveFile_t* selected,
+    bool favorites,
+    LoaderStatus* status) {
     Loader* loader = furi_record_open(RECORD_LOADER);
 
     const char* app_name = archive_get_flipper_app_name(selected->type);
@@ -154,11 +182,11 @@ static void
             furi_string_left(app_name, slash);
             FuriString* app_args =
                 furi_string_alloc_set_str(furi_string_get_cstr(app_name) + slash + 1);
-            loader_start_with_gui_error(
+            *status = loader_start_with_gui_error(
                 loader, furi_string_get_cstr(app_name), furi_string_get_cstr(app_args));
             furi_string_free(app_args);
         } else {
-            loader_start_with_gui_error(loader, furi_string_get_cstr(app_name), NULL);
+            *status = loader_start_with_gui_error(loader, furi_string_get_cstr(app_name), NULL);
         }
         furi_string_free(app_name);
     } else if(selected->type == ArchiveFileTypeSearch) {
@@ -172,7 +200,7 @@ static void
             if(param != NULL) {
                 param++;
             }
-            loader_start_with_gui_error(loader, app_name, param);
+            *status = loader_start_with_gui_error(loader, app_name, param);
         } else {
             const char* str = furi_string_get_cstr(selected->path);
             if(favorites &&
@@ -181,7 +209,7 @@ static void
                 selected->type == ArchiveFileTypeSubGhz)) {
                 char arg[strlen(str) + 4];
                 snprintf(arg, sizeof(arg), "fav%s", str);
-                loader_start_with_gui_error(loader, app_name, arg);
+                *status = loader_start_with_gui_error(loader, app_name, arg);
             } else {
                 loader_start_detached_with_gui_error(loader, app_name, str);
             }

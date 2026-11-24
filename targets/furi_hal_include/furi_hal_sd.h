@@ -44,6 +44,24 @@ bool furi_hal_sd_is_present(void);
 uint8_t furi_hal_sd_max_mount_retry_count(void);
 
 /**
+ * @brief Predicate asked before an I/O error retry power-cycles the card.
+ * @return true if cutting ext3.3V (shared with header pin 9) is allowed now.
+ */
+typedef bool (*FuriHalSdPowerResetGuard)(void);
+
+/**
+ * @brief Set the power reset guard for read/write error retries.
+ *
+ * A power reset cuts ext3.3V, which also feeds header pin 9, and browns out
+ * a module running from it. While the guard returns false, retries
+ * reinitialise the card without cutting power, except on the last even
+ * attempt, which stays as a last resort. Firmware-internal.
+ *
+ * @param guard predicate, or NULL to always allow (the default)
+ */
+void furi_hal_sd_set_power_reset_guard(FuriHalSdPowerResetGuard guard);
+
+/**
  * @brief Init SD card
  * @param power_reset reset card power
  * @return FuriStatus 

@@ -47,8 +47,53 @@ typedef enum {
     CoprocTaskCrc32, /**< CRC-32, IEEE 802.3 polynomial. Pipeline smoke test; not a speed win, see warning above. */
     CoprocTaskCompressHeatshrink, /**< Heatshrink LZSS compression. */
     CoprocTaskDecompressHeatshrink, /**< Heatshrink LZSS decompression. */
+    /** Reserved: the VGM firmware already uses id 3 for HID inject
+     * (COPROC_TASK_HID_INJECT). No Flipper-side caller yet; no local fallback. */
+    CoprocTaskHidInject = 3,
+    /** Remote GPIO expander on the VGM breakout, see CoprocGpioOp. No local
+     * fallback: coproc_run() returns false when no module answers. */
+    CoprocTaskGpio = 4,
     CoprocTaskCount,
 } CoprocTaskType;
+
+/**
+ * @brief CoprocTaskGpio wire format.
+ *
+ * Input: one or more records of COPROC_GPIO_RECORD_SIZE bytes,
+ * [u8 CoprocGpioOp][u8 pin][u8 arg]. Output: one record of the same size per
+ * input record, in order, [u8 CoprocGpioStatus][u16 value LE].
+ *
+ * Pins are RP2040 GPIO numbers. The module only accepts its breakout pins,
+ * GPIO 16, 17 and 21-29 (ADC on 26-29), and refuses any other pin per record
+ * with CoprocGpioStatusBadPin. GPIO 21, 24 and 25 also drive the VGM's RGB
+ * LED, so the module's LED status code may overwrite them.
+ *
+ * Keep in sync with app/coproc_gpio.h in the VGM firmware.
+ */
+#define COPROC_GPIO_RECORD_SIZE (3U)
+
+typedef enum {
+    CoprocGpioOpMode = 0, /**< arg: CoprocGpioMode */
+    CoprocGpioOpWrite = 1, /**< arg: 0 = low, else high. Pin must be in output mode. */
+    CoprocGpioOpRead = 2, /**< value: 0 or 1 */
+    CoprocGpioOpAdc = 3, /**< value: raw 12-bit sample, 3.3 V full scale. Pins 26-29 only. */
+} CoprocGpioOp;
+
+typedef enum {
+    CoprocGpioModeInput = 0,
+    CoprocGpioModeOutput = 1,
+    CoprocGpioModePullUp = 2,
+    CoprocGpioModePullDown = 3,
+} CoprocGpioMode;
+
+typedef enum {
+    CoprocGpioStatusOk = 0,
+    CoprocGpioStatusBadPin = 1, /**< Not a breakout pin, refused. */
+    CoprocGpioStatusBadOp = 2,
+    CoprocGpioStatusBadArg = 3,
+    CoprocGpioStatusNoAdc = 4, /**< ADC on a pin without an ADC channel. */
+    CoprocGpioStatusNotOutput = 5, /**< Write to a pin that isn't in output mode. */
+} CoprocGpioStatus;
 
 /**
  * @brief Local fallback implementation function type.

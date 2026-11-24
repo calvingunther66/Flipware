@@ -691,7 +691,31 @@ void archive_refresh_dir(ArchiveBrowserView* browser) {
     FuriString* str = furi_string_alloc();
     if(current != NULL) {
         path_extract_basename(furi_string_get_cstr(current->path), str);
+    } else if(!furi_string_empty(browser->resume_name)) {
+        // The list was freed while an app ran; reselect what was selected
+        furi_string_set(str, browser->resume_name);
     }
+    furi_string_reset(browser->resume_name);
     file_browser_worker_folder_refresh_sel(browser->worker, furi_string_get_cstr(str));
     furi_string_free(str);
+}
+
+void archive_release_list(ArchiveBrowserView* browser) {
+    furi_assert(browser);
+
+    ArchiveFile_t* current = archive_get_current_file(browser);
+    if(current != NULL) {
+        path_extract_basename(furi_string_get_cstr(current->path), browser->resume_name);
+    }
+
+    // Free the items and the array buffer itself (reset keeps the capacity);
+    // the list is rebuilt when the launched app exits.
+    with_view_model(
+        browser->view,
+        ArchiveBrowserViewModel * model,
+        {
+            files_array_clear(model->files);
+            files_array_init(model->files);
+        },
+        false);
 }

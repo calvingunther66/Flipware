@@ -414,6 +414,13 @@ uint32_t furi_hal_power_get_battery_design_capacity(void) {
     return ret;
 }
 
+uint16_t furi_hal_power_get_battery_cycle_count(void) {
+    furi_hal_i2c_acquire(&furi_hal_i2c_handle_power);
+    uint16_t ret = bq27220_get_cycle_count(&furi_hal_i2c_handle_power);
+    furi_hal_i2c_release(&furi_hal_i2c_handle_power);
+    return ret;
+}
+
 float furi_hal_power_get_battery_voltage(FuriHalPowerIC ic) {
     float ret = 0.0f;
 
@@ -554,10 +561,8 @@ void furi_hal_power_info_get(PropertyValueCallback out, char sep, void* context)
     property_value_out(&property_context, "%d", 2, "battery", "temp", temperature);
     property_value_out(
         &property_context, "%u", 2, "battery", "health", furi_hal_power_get_bat_health_pct());
-    furi_hal_i2c_acquire(&furi_hal_i2c_handle_power);
-    uint16_t cycles = bq27220_get_cycle_count(&furi_hal_i2c_handle_power);
-    furi_hal_i2c_release(&furi_hal_i2c_handle_power);
-    property_value_out(&property_context, "%u", 2, "battery", "cycles", cycles);
+    property_value_out(
+        &property_context, "%u", 2, "battery", "cycles", furi_hal_power_get_battery_cycle_count());
     property_value_out(
         &property_context,
         "%lu",

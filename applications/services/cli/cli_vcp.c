@@ -53,6 +53,10 @@ struct CliVcp {
     volatile bool is_currently_transmitting;
     size_t previous_tx_length;
 
+    // DTR change that did not fit into internal_evt_queue: -1 none,
+    // otherwise a CliVcpInternalEvent (Connected/Disconnected)
+    volatile int8_t pending_line_event;
+
     CliRegistry* main_registry;
     CliShell* shell;
 
@@ -105,8 +109,18 @@ static void cli_vcp_maybe_receive_data(CliVcp* cli_vcp) {
 // CDC callbacks
 // =============
 
+// Called from USB interrupts, so it cannot wait. The queue can fill up while
+// the VCP thread is blocked (e.g. waiting for a command to finish after the
+// host disconnected) and the host keeps sending: that used to fail a
+// furi_check and reboot. Rx/TxDone are only wake-ups (every handled event
+// services both directions), so they can be dropped; a DTR change is kept
+// aside and applied with the next handled event.
 static void cli_vcp_signal_internal_event(CliVcp* cli_vcp, CliVcpInternalEvent event) {
-    furi_check(furi_message_queue_put(cli_vcp->internal_evt_queue, &event, 0) == FuriStatusOk);
+    if(furi_message_queue_put(cli_vcp->internal_evt_queue, &event, 0) == FuriStatusOk) return;
+
+    if(event == CliVcpInternalEventConnected || event == CliVcpInternalEventDisconnected) {
+        cli_vcp->pending_line_event = (int8_t)event;
+    }
 }
 
 static void cli_vcp_cdc_tx_done(void* context) {
@@ -255,20 +269,31 @@ static void cli_vcp_message_received(FuriEventLoopObject* object, void* context)
 /**
  * Processes messages arriving from CDC event callbacks
  */
+static void cli_vcp_process_internal_event(CliVcp* cli_vcp, CliVcpInternalEvent event);
+
 static void cli_vcp_internal_event_happened(FuriEventLoopObject* object, void* context) {
     CliVcp* cli_vcp = context;
     CliVcpInternalEvent event;
     furi_check(furi_message_queue_get(object, &event, 0) == FuriStatusOk);
 
-    switch(event) {
-    case CliVcpInternalEventRx: {
-        VCP_TRACE(TAG, "Rx");
-        cli_vcp_maybe_receive_data(cli_vcp);
-        break;
-    }
+    cli_vcp_process_internal_event(cli_vcp, event);
 
+    // A DTR change that did not fit into the queue
+    FURI_CRITICAL_ENTER();
+    int8_t pending = cli_vcp->pending_line_event;
+    cli_vcp->pending_line_event = -1;
+    FURI_CRITICAL_EXIT();
+    if(pending >= 0) cli_vcp_process_internal_event(cli_vcp, (CliVcpInternalEvent)pending);
+}
+
+static void cli_vcp_process_internal_event(CliVcp* cli_vcp, CliVcpInternalEvent event) {
+    switch(event) {
+    case CliVcpInternalEventRx:
     case CliVcpInternalEventTxDone: {
-        VCP_TRACE(TAG, "TxDone");
+        // Service both directions: a dropped wake-up of either kind is
+        // covered by whichever event gets through
+        VCP_TRACE(TAG, event == CliVcpInternalEventRx ? "Rx" : "TxDone");
+        cli_vcp_maybe_receive_data(cli_vcp);
         cli_vcp_maybe_send_data(cli_vcp);
         break;
     }
@@ -300,6 +325,7 @@ static void cli_vcp_internal_event_happened(FuriEventLoopObject* object, void* c
 
 static CliVcp* cli_vcp_alloc(void) {
     CliVcp* cli_vcp = malloc(sizeof(CliVcp));
+    cli_vcp->pending_line_event = -1;
 
     cli_vcp->event_loop = furi_event_loop_alloc();
 

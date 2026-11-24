@@ -288,7 +288,10 @@ static void storage_cli_read_chunks(PipeSide* pipe, FuriString* path, FuriString
             uint8_t* data = malloc(buffer_size);
             while(file_size > 0) {
                 printf("\r\nReady?\r\n");
-                getchar();
+                // EOF: the host went away. Stop instead of pushing the rest of
+                // the file into a dead pipe (100 ms per flush), which keeps the
+                // CLI from accepting a new connection until it is done.
+                if(getchar() == EOF) break;
 
                 size_t read_size = storage_file_read(file, data, buffer_size);
                 for(size_t i = 0; i < read_size; i++) {

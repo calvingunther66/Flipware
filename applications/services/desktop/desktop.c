@@ -229,7 +229,14 @@ static void desktop_clock_timer_callback(void* context) {
     furi_assert(context);
     Desktop* desktop = context;
 
-    const bool clock_enabled = gui_active_view_port_count(desktop->gui, GuiLayerStatusBarLeft) < 6;
+    // If the GUI is busy drawing, keep the clock's current visibility and
+    // check again on the next tick rather than block the timer thread.
+    size_t left_icons;
+    if(!gui_try_active_view_port_count(desktop->gui, GuiLayerStatusBarLeft, &left_icons)) {
+        desktop_clock_update(desktop);
+        return;
+    }
+    const bool clock_enabled = left_icons < 6;
 
     if(clock_enabled) {
         desktop_clock_update(desktop);

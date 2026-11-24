@@ -120,3 +120,5 @@ void archive_switch_tab(ArchiveBrowserView* browser, InputKey key);
 void archive_enter_dir(ArchiveBrowserView* browser, FuriString* name);
 void archive_leave_dir(ArchiveBrowserView* browser);
 void archive_refresh_dir(ArchiveBrowserView* browser);
+/** Free the file list while a launched app runs (rebuilt on its exit) */
+void archive_release_list(ArchiveBrowserView* browser);

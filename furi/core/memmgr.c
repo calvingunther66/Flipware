@@ -1,5 +1,6 @@
 #include "memmgr.h"
 #include <string.h>
+#include <stdint.h>
 #include <furi_hal_memory.h>
 #include <FreeRTOS.h>
 
@@ -17,22 +18,38 @@ void free(void* ptr) {
     vPortFree(ptr);
 }
 
+// Defined in memmgr_heap.c, not part of the public API.
+size_t memmgr_heap_get_usable_size(const void* pv);
+
 void* realloc(void* ptr, size_t size) {
     if(size == 0) {
         vPortFree(ptr);
         return NULL;
     }
 
-    void* p = pvPortMalloc(size);
-    if(ptr != NULL) {
-        memcpy(p, ptr, size);
-        vPortFree(ptr);
+    if(ptr == NULL) {
+        return pvPortMalloc(size);
     }
+
+    const size_t old_size = memmgr_heap_get_usable_size(ptr);
+
+    // Keep the block when the new size fits and doesn't waste more than half
+    // of it: no new allocation, no copy, and no transient old + new peak.
+    if(size <= old_size && size >= old_size / 2) {
+        return ptr;
+    }
+
+    void* p = pvPortMalloc(size);
+    // Copy only what the old block holds (copying `size` bytes over-read it).
+    memcpy(p, ptr, size < old_size ? size : old_size);
+    vPortFree(ptr);
 
     return p;
 }
 
 void* calloc(size_t count, size_t size) {
+    // count * size must not wrap around into a small allocation.
+    furi_check(size == 0 || count <= SIZE_MAX / size, "calloc overflow");
     return pvPortMalloc(count * size);
 }
 

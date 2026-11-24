@@ -4,6 +4,14 @@
 
 #define VIEW_DISPATCHER_QUEUE_LEN (16U)
 
+// The GUI thread delivers input while holding the GUI lock. If the app's
+// queue stays full (the app is stuck, or is itself waiting for the GUI lock),
+// an unbounded wait here freezes the whole UI. Wait a while, then drop.
+// Release is never dropped: a lost Release leaves a key held in the app
+// (e.g. Sub-GHz keeps transmitting). A dropped Press is safe, since its
+// Short/Long/Repeat are then discarded as non-complementary.
+#define VIEW_DISPATCHER_INPUT_TIMEOUT_MS (500U)
+
 ViewDispatcher* view_dispatcher_alloc(void) {
     ViewDispatcher* dispatcher = view_dispatcher_alloc_ex(furi_event_loop_alloc());
     dispatcher->is_event_loop_owned = true;
@@ -257,9 +265,11 @@ void view_dispatcher_draw_callback(Canvas* canvas, void* context) {
 
 void view_dispatcher_input_callback(InputEvent* event, void* context) {
     ViewDispatcher* view_dispatcher = context;
-    furi_check(
-        furi_message_queue_put(view_dispatcher->input_queue, event, FuriWaitForever) ==
-        FuriStatusOk);
+    const uint32_t timeout = event->type == InputTypeRelease ? FuriWaitForever :
+                                                               VIEW_DISPATCHER_INPUT_TIMEOUT_MS;
+    if(furi_message_queue_put(view_dispatcher->input_queue, event, timeout) != FuriStatusOk) {
+        FURI_LOG_W(TAG, "Input queue full, event dropped");
+    }
 }
 
 bool view_dispatcher_ascii_callback(AsciiEvent* event, void* context) {
@@ -267,9 +277,11 @@ bool view_dispatcher_ascii_callback(AsciiEvent* event, void* context) {
     // So instead ViewDispatcher tells ViewPort that all events are consumed
     // Then ViewDispatcher handles fallbacks the same way as ViewPort would have done
     ViewDispatcher* view_dispatcher = context;
-    furi_check(
-        furi_message_queue_put(view_dispatcher->ascii_queue, event, FuriWaitForever) ==
-        FuriStatusOk);
+    if(furi_message_queue_put(
+           view_dispatcher->ascii_queue, event, VIEW_DISPATCHER_INPUT_TIMEOUT_MS) !=
+       FuriStatusOk) {
+        FURI_LOG_W(TAG, "ASCII queue full, event dropped");
+    }
     return true;
 }
 
