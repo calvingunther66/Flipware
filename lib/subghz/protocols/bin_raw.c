@@ -357,8 +357,8 @@ void* subghz_protocol_decoder_bin_raw_alloc(SubGhzEnvironment* environment) {
     instance->base.protocol = &subghz_protocol_bin_raw;
     instance->generic.protocol_name = instance->base.protocol->name;
     instance->data_raw_ind = 0;
-    // data_raw/data (10 KB) are allocated on first use, see
-    // bin_raw_decoder_alloc_buffers()
+    instance->data_raw = malloc(BIN_RAW_BUF_RAW_SIZE * sizeof(int32_t));
+    instance->data = malloc(BIN_RAW_BUF_RAW_SIZE * sizeof(uint8_t));
     memset(instance->data_markup, 0x00, BIN_RAW_MAX_MARKUP_COUNT * sizeof(BinRAW_Markup));
     instance->adaptive_threshold_rssi = BIN_RAW_THRESHOLD_RSSI;
     return instance;
@@ -383,38 +383,9 @@ void subghz_protocol_decoder_bin_raw_reset(void* context) {
 #endif
 }
 
-/**
- * Allocate the 10 KB capture buffers on first use.
- * Every Sub-GHz receiver allocates a BinRAW decoder, but it is only fed when
- * BinRAW is enabled in the receiver filter, so most sessions never need them.
- * The first feed comes right when receiving starts, before the history takes
- * memory. If there is no room, BinRAW just doesn't decode instead of the app
- * rebooting on out-of-memory.
- */
-static bool bin_raw_decoder_alloc_buffers(SubGhzProtocolDecoderBinRAW* instance) {
-    if(instance->data_raw) return true;
-
-    const size_t raw_size = BIN_RAW_BUF_RAW_SIZE * sizeof(int32_t);
-    const size_t data_size = BIN_RAW_BUF_RAW_SIZE * sizeof(uint8_t);
-    bool allocated = false;
-
-    furi_kernel_lock();
-    if(memmgr_heap_get_max_free_block() >= raw_size + data_size + 1024) {
-        instance->data = malloc(data_size);
-        instance->data_raw = malloc(raw_size);
-        allocated = true;
-    }
-    furi_kernel_unlock();
-
-    if(!allocated) FURI_LOG_W(TAG, "Not enough memory for BinRAW buffers");
-    return allocated;
-}
-
 void subghz_protocol_decoder_bin_raw_feed(void* context, bool level, uint32_t duration) {
     furi_assert(context);
     SubGhzProtocolDecoderBinRAW* instance = context;
-
-    if(!bin_raw_decoder_alloc_buffers(instance)) return;
 
     if(instance->decoder.parser_step == BinRAWDecoderStepWrite) {
         if(instance->data_raw_ind == BIN_RAW_BUF_RAW_SIZE) {
@@ -922,12 +893,8 @@ void subghz_protocol_decoder_bin_raw_data_input_rssi(
         bin_raw_debug("%ld %ld :", (int32_t)rssi, (int32_t)instance->adaptive_threshold_rssi);
         if(rssi > (instance->adaptive_threshold_rssi + BIN_RAW_DELTA_RSSI)) {
             instance->data_raw_ind = 0;
-            // No buffers yet: the decoder was never fed, so there is nothing
-            // to clear (and nothing will be analyzed)
-            if(instance->data_raw) {
-                memset(instance->data_raw, 0x00, BIN_RAW_BUF_RAW_SIZE * sizeof(int32_t));
-                memset(instance->data, 0x00, BIN_RAW_BUF_RAW_SIZE * sizeof(uint8_t));
-            }
+            memset(instance->data_raw, 0x00, BIN_RAW_BUF_RAW_SIZE * sizeof(int32_t));
+            memset(instance->data, 0x00, BIN_RAW_BUF_RAW_SIZE * sizeof(uint8_t));
             instance->decoder.parser_step = BinRAWDecoderStepWrite;
             bin_raw_debug_tag(TAG, "RSSI\r\n");
         } else {
@@ -1004,7 +971,6 @@ uint32_t subghz_protocol_decoder_bin_raw_get_hash_data(void* context) {
         uint32_t full;
         uint8_t split[4];
     } hash = {0};
-    if(!instance->data) return hash.full;
     uint8_t* p = instance->data + instance->data_markup[0].byte_bias;
     size_t len = subghz_protocol_bin_raw_get_full_byte(instance->data_markup[0].bit_count);
     for(size_t i = 0; i < len; i++) {
@@ -1019,7 +985,6 @@ SubGhzProtocolStatus subghz_protocol_decoder_bin_raw_serialize(
     SubGhzRadioPreset* preset) {
     furi_assert(context);
     SubGhzProtocolDecoderBinRAW* instance = context;
-    if(!instance->data) return SubGhzProtocolStatusError;
 
     SubGhzProtocolStatus res = subghz_block_generic_serialize_common(
         instance->generic.protocol_name, flipper_format, preset);
@@ -1068,7 +1033,6 @@ SubGhzProtocolStatus
     subghz_protocol_decoder_bin_raw_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
     SubGhzProtocolDecoderBinRAW* instance = context;
-    if(!bin_raw_decoder_alloc_buffers(instance)) return SubGhzProtocolStatusError;
 
     SubGhzProtocolStatus res = SubGhzProtocolStatusError;
     uint32_t temp_data = 0;
@@ -1137,10 +1101,6 @@ SubGhzProtocolStatus
 void subghz_protocol_decoder_bin_raw_get_string(void* context, FuriString* output) {
     furi_assert(context);
     SubGhzProtocolDecoderBinRAW* instance = context;
-    if(!instance->data) {
-        furi_string_cat_printf(output, "%s", instance->generic.protocol_name);
-        return;
-    }
     furi_string_cat_printf(
         output,
         "%s %dbit\r\n"

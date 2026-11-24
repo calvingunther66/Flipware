@@ -27,9 +27,6 @@ struct SubGhzWorker {
  */
 void subghz_worker_rx_callback(bool level, uint32_t duration, void* context) {
     SubGhzWorker* instance = context;
-    // The buffer only exists once the worker has been started; nothing reads
-    // samples before that, so drop them.
-    if(!instance->stream) return;
 
     LevelDuration level_duration = level_duration_make(level, duration);
     if(instance->overrun) {
@@ -85,11 +82,11 @@ static int32_t subghz_worker_thread_callback(void* context) {
 SubGhzWorker* subghz_worker_alloc(void) {
     SubGhzWorker* instance = malloc(sizeof(SubGhzWorker));
 
-    // The thread (2 KB stack) and the 16 KB sample buffer are allocated on the
-    // first subghz_worker_start(): apps allocate a worker up front, but many
-    // sessions never receive, and that RAM is what other services need while
-    // the app is open. Once allocated they stay until subghz_worker_free(), so
-    // a later start never has to find 18 KB again.
+    instance->thread =
+        furi_thread_alloc_ex("SubGhzWorker", 2048, subghz_worker_thread_callback, instance);
+
+    instance->stream =
+        furi_stream_buffer_alloc(sizeof(LevelDuration) * 4096, sizeof(LevelDuration));
 
     //setting default filter in us
     instance->filter_duration = 30;
@@ -100,15 +97,8 @@ SubGhzWorker* subghz_worker_alloc(void) {
 void subghz_worker_free(SubGhzWorker* instance) {
     furi_check(instance);
 
-    if(instance->stream) {
-        // Make the rx callback see "no buffer" before it goes away
-        FURI_CRITICAL_ENTER();
-        FuriStreamBuffer* stream = instance->stream;
-        instance->stream = NULL;
-        FURI_CRITICAL_EXIT();
-        furi_stream_buffer_free(stream);
-    }
-    if(instance->thread) furi_thread_free(instance->thread);
+    furi_stream_buffer_free(instance->stream);
+    furi_thread_free(instance->thread);
 
     free(instance);
 }
@@ -133,15 +123,6 @@ void subghz_worker_set_context(SubGhzWorker* instance, void* context) {
 void subghz_worker_start(SubGhzWorker* instance) {
     furi_check(instance);
     furi_check(!instance->running);
-
-    if(!instance->thread) {
-        instance->thread =
-            furi_thread_alloc_ex("SubGhzWorker", 2048, subghz_worker_thread_callback, instance);
-    }
-    if(!instance->stream) {
-        instance->stream =
-            furi_stream_buffer_alloc(sizeof(LevelDuration) * 4096, sizeof(LevelDuration));
-    }
 
     instance->running = true;
 
