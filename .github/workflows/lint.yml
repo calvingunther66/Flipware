@@ -12,6 +12,9 @@ on:
 env:
   SET_GH_OUTPUT: 1
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest

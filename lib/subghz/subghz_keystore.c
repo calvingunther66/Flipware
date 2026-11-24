@@ -131,7 +131,7 @@ static bool subghz_keystore_read_file(SubGhzKeystore* instance, Stream* stream, 
         size_t ret = 0;
         do {
             ret = stream_read(stream, buffer, FILE_BUFFER_SIZE);
-            for(uint16_t i = 0; i < ret; i++) {
+            for(size_t i = 0; i < ret; i++) {
                 if(buffer[i] == '\n' && encrypted_line_cursor > 0) {
                     // Process line
                     if(iv) {
@@ -567,7 +567,7 @@ bool subghz_keystore_raw_get_data(const char* file_name, size_t offset, uint8_t*
             stream_seek(stream, ((offset / 16) - 1) * 32, StreamOffsetFromCurrent);
             ret = stream_read(stream, buffer, 32);
             furi_assert(ret == 32);
-            for(uint16_t i = 0; i < ret - 1; i += 2) {
+            for(size_t i = 0; i + 1 < ret; i += 2) {
                 uint8_t hi_nibble = 0;
                 uint8_t lo_nibble = 0;
                 hex_char_to_hex_nibble(buffer[i], &hi_nibble);
@@ -585,7 +585,7 @@ bool subghz_keystore_raw_get_data(const char* file_name, size_t offset, uint8_t*
             memset(buffer, 0, bufer_size);
             ret = stream_read(stream, buffer, bufer_size);
             furi_assert(ret == bufer_size);
-            for(uint16_t i = 0; i < ret - 1; i += 2) {
+            for(size_t i = 0; i + 1 < ret; i += 2) {
                 uint8_t hi_nibble = 0;
                 uint8_t lo_nibble = 0;
                 hex_char_to_hex_nibble(buffer[i], &hi_nibble);

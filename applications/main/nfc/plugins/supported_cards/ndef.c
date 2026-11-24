@@ -428,7 +428,7 @@ static bool ndef_parse_vcard(Ndef* ndef, size_t pos, size_t len) {
     static const char* const end_tag = "END:VCARD";
     static const uint8_t end_len = strlen(end_tag);
     char tmp[13] = {0}; // Enough for BEGIN:VCARD\r\n
-    uint8_t skip = 0;
+    size_t skip = 0;
 
     // Skip BEGIN tag
     if(len >= sizeof(tmp)) {

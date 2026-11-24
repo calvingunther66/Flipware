@@ -359,7 +359,7 @@ static bool emv_decode_tl(
     const uint8_t* fmt,
     uint8_t fmt_len,
     EmvApplication* app) {
-    uint8_t i = 0;
+    uint16_t i = 0;
     uint8_t f = 0;
     uint16_t tag = 0;
     uint8_t tlen = 0;
@@ -370,6 +370,8 @@ static bool emv_decode_tl(
     while(f < fmt_len && i < len) {
         success = emv_parse_tag(fmt, fmt_len, &tag, &tlen, &f);
         if(!success) return success;
+        // The format comes from the card: never read past the record it describes
+        if(tlen > len - i) break;
         emv_decode_tlv_tag(&buff[i], tag, tlen, app);
         i += tlen;
     }
