@@ -152,7 +152,18 @@ class Flipper:
 
     def command(self, line, timeout=5.0):
         self.ser.write(line.encode() + b"\r")
-        lines = self._read_until_prompt(timeout)
+        # Stale prompts (the banner's, or one from sync()'s empty line) can still be
+        # queued. Skip ahead to the shell's echo of this command and use what follows.
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise Fail("Timed out waiting for the Flipper's reply.")
+            block = self._read_until_prompt(remaining)
+            echoes = [i for i, l in enumerate(block) if l.endswith(line)]
+            if echoes:
+                lines = block[echoes[-1] + 1 :]
+                break
         if any("cannot be run while an application is open" in l for l in lines):
             raise Fail("An app is open on the Flipper. Go back to the desktop, then try again.")
         replies = []
