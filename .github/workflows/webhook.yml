@@ -18,6 +18,9 @@ on:
     types:
       - "created"
 
+permissions:
+  contents: read
+
 jobs:
   webhook:
     runs-on: ubuntu-latest
@@ -26,7 +29,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Send webhook
         env:

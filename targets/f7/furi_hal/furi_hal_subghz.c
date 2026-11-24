@@ -217,8 +217,8 @@ void furi_hal_subghz_load_custom_preset(const uint8_t* preset_data) {
             FURI_LOG_D(TAG, "Reg[%lu]: %02X=%02X", i, preset_data[i], preset_data[i + 1]);
             i += 2;
         }
-        for(uint8_t y = i; y < i + 10; y++) {
-            FURI_LOG_D(TAG, "PA[%u]:  %02X", y, preset_data[y]);
+        for(uint32_t y = i; y < i + 10; y++) {
+            FURI_LOG_D(TAG, "PA[%lu]:  %02X", y, preset_data[y]);
         }
     }
 }

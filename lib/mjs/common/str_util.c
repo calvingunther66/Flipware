@@ -405,6 +405,7 @@ int mg_avprintf(char** buf, size_t size, const char* fmt, va_list ap) {
         *buf = NULL; /* LCOV_EXCL_START */
         while(len < 0) {
             MG_FREE(*buf);
+            *buf = NULL;
             if(size == 0) {
                 size = 5;
             }
@@ -422,7 +423,7 @@ int mg_avprintf(char** buf, size_t size, const char* fmt, va_list ap) {
      * Microsoft version of vsnprintf() is not always null-terminated, so put
      * the terminator manually
      */
-        (*buf)[len] = 0;
+        if(*buf != NULL && len >= 0) (*buf)[len] = 0;
         /* LCOV_EXCL_STOP */
     } else if(len >= (int)size) {
         /* Standard-compliant code path. Allocate a buffer that is large enough. */
