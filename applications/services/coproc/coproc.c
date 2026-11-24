@@ -133,6 +133,8 @@ int32_t coproc_srv(void* p) {
         instance, CoprocTaskCompressHeatshrink, coproc_fallback_compress, NULL);
     coproc_register_fallback(
         instance, CoprocTaskDecompressHeatshrink, coproc_fallback_decompress, NULL);
+    // CoprocTaskHidInject and CoprocTaskGpio act on the module's own hardware,
+    // so they have no local fallback: coproc_run() returns false without one.
 
     furi_record_create(RECORD_COPROC, instance);
 

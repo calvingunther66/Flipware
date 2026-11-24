@@ -21,6 +21,7 @@
 #define FLAG_SET(x, y) (((x) & (y)) == (y))
 
 static bool sd_high_capacity = false;
+static volatile FuriHalSdPowerResetGuard sd_power_reset_guard = NULL;
 
 typedef enum {
     SdSpiDataResponceOK = 0x05,
@@ -971,6 +972,19 @@ FuriStatus furi_hal_sd_get_card_state(void) {
     return status;
 }
 
+void furi_hal_sd_set_power_reset_guard(FuriHalSdPowerResetGuard guard) {
+    sd_power_reset_guard = guard;
+}
+
+// Even retry attempts power-cycle the card, unless the guard objects. The
+// last even attempt (counter == 2) always may, as a last resort.
+static bool sd_retry_power_reset(uint8_t counter) {
+    if((counter % 2) != 0) return false;
+    if(counter <= 2) return true;
+    FuriHalSdPowerResetGuard guard = sd_power_reset_guard;
+    return guard == NULL || guard();
+}
+
 FuriStatus furi_hal_sd_read_blocks(uint32_t* buff, uint32_t sector, uint32_t count) {
     furi_check(buff);
 
@@ -989,12 +1003,7 @@ FuriStatus furi_hal_sd_read_blocks(uint32_t* buff, uint32_t sector, uint32_t cou
         uint8_t counter = furi_hal_sd_max_mount_retry_count();
 
         while(status != FuriStatusOk && counter > 0 && furi_hal_sd_is_present()) {
-            if((counter % 2) == 0) {
-                // power reset sd card
-                status = furi_hal_sd_init(true);
-            } else {
-                status = furi_hal_sd_init(false);
-            }
+            status = furi_hal_sd_init(sd_retry_power_reset(counter));
 
             if(status == FuriStatusOk) {
                 status = sd_device_read(buff, sector, count);
@@ -1023,12 +1032,7 @@ FuriStatus furi_hal_sd_write_blocks(const uint32_t* buff, uint32_t sector, uint3
         uint8_t counter = furi_hal_sd_max_mount_retry_count();
 
         while(status != FuriStatusOk && counter > 0 && furi_hal_sd_is_present()) {
-            if((counter % 2) == 0) {
-                // power reset sd card
-                status = furi_hal_sd_init(true);
-            } else {
-                status = furi_hal_sd_init(false);
-            }
+            status = furi_hal_sd_init(sd_retry_power_reset(counter));
 
             if(status == FuriStatusOk) {
                 status = sd_device_write(buff, sector, count);
