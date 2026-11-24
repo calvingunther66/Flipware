@@ -48,6 +48,8 @@ struct LFRFIDWorker {
 
     ProtocolDict* protocols;
     LFRFIDProtocol protocol;
+
+    LFRFIDWriteTargetMask write_target_mask;
 };
 
 extern const LFRFIDWorkerModeType lfrfid_worker_modes[];
