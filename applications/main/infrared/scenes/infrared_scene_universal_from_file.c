@@ -46,8 +46,7 @@ void infrared_scene_universal_from_file_on_enter(void* context) {
 
     // Coming back from saving a signal: the library in file_path is the one that was open
     const bool is_returning =
-        scene_manager_get_scene_state(
-            infrared->scene_manager, InfraredSceneUniversalFromFile) ==
+        scene_manager_get_scene_state(infrared->scene_manager, InfraredSceneUniversalFromFile) ==
             INFRARED_SCENE_UNIVERSAL_STATE_RETURNING &&
         !furi_string_empty(infrared->file_path);
     scene_manager_set_scene_state(infrared->scene_manager, InfraredSceneUniversalFromFile, 0);
