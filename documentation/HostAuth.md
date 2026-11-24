@@ -156,7 +156,7 @@ Error codes:
 - A new `challenge` kills the old one.
 
 **Backoff:**
-- **Allowance:** three free failures. After that, `challenge` is refused for 30 s, doubling up to a maximum of 1 h.
+- **Allowance:** three free failures. After the third, `challenge` is refused for 30 s; each further failure doubles the wait, up to a maximum of 1 h.
 - **What counts as a failure:** a bad, expired or malformed response.
 - **Persistence:** the fail count and the time of the last failure (RTC timestamp) are kept in RTC backup registers, so the wait survives a reboot and a power-off/on.
 - **Clock set backwards:** the wait restarts from "now" instead of trusting a future timestamp.
@@ -189,6 +189,7 @@ Error codes:
 - **MAC (16 bytes):** AES-CBC-MAC over the fixed-length record.
   - It uses the device's **unique key**, in the STM32WB radio core's key store (slot 11), with fixed IV `hostauth-mac-v2`.
   - The firmware's `crypto` CLI no longer encrypts or decrypts with slot 11. That CLI was a chosen-IV oracle that let anyone with USB access compute this MAC.
+  - That guard lives in the `crypto` CLI plugin (`/ext/apps_data/cli/plugins/cli_crypto.fal`), like the `input send` fix in `cli_input.fal`. A firmware-only flash (`./fbt flash_usb`) leaves the old plugins on the SD card; install the update package so they are replaced. An old plugin copied back brings the oracle back, which is the "malicious USB host while unlocked" case below.
 
 **Anti-rollback:**
 - An RTC backup register holds the current epoch. A file loads only if its epoch matches.
@@ -361,6 +362,6 @@ They only do symmetric AES (CBC, CTR, GCM). There is no ECC and no signing in th
 - Add a Touch ID finger: the next `unlock` explains the invalidated key, and `status` shows it.
 - `--allow-password` enrollment works with the password prompt.
 
-**`crypto` CLI:** `crypto encrypt 11 …` is refused, and other slots still work.
+**`crypto` CLI:** after an update-package install (not `flash_usb` alone, which keeps the old SD plugins), `crypto encrypt 11 …` is refused, and other slots still work. The same goes for `input send` being ignored by the enrollment prompt.
 
 **Windows/Linux tool:** run it at all, with Windows Hello and with a YubiKey or similar. Check the signCount handling with a security key that increments its counter, and that the counter is saved.
