@@ -529,6 +529,18 @@ void vPortFree(void* pv) {
 }
 /*-----------------------------------------------------------*/
 
+size_t memmgr_heap_get_usable_size(const void* pv) {
+    /* Same header lookup as vPortFree(); used by realloc() to grow or shrink
+     * in place and to copy only the bytes the old block really has. */
+    furi_check(pv);
+    const BlockLink_t* pxLink = (const void*)((const uint8_t*)pv - xHeapStructSize);
+    heapVALIDATE_BLOCK_POINTER(pxLink);
+    furi_check(heapBLOCK_IS_ALLOCATED(pxLink));
+    return (pxLink->xBlockSize & ~heapBLOCK_ALLOCATED_BITMASK) - xHeapStructSize;
+}
+
+/*-----------------------------------------------------------*/
+
 size_t xPortGetFreeHeapSize(void) {
     return xFreeBytesRemaining;
 }

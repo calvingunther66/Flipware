@@ -5,8 +5,6 @@
 
 #define TAG "Coproc"
 
-#define COPROC_QUEUE_SIZE (1UL)
-#define COPROC_STACK_SIZE (768UL)
 
 // Default local fallbacks, wired to Momentum's existing crc32/compress
 // utilities so behavior is unchanged when no module is connected. See
@@ -108,11 +106,13 @@ void coproc_expansion_callback(
     furi_mutex_release(instance->pending_mutex);
 }
 
-int32_t coproc_srv(void* p) {
-    UNUSED(p);
+// Runs once as a system start hook. The service never had work of its own:
+// coproc_run() and the expansion callback run on their callers' threads and
+// share this struct through its mutexes, so an idle thread (1 KB stack plus
+// thread object and queue) bought nothing.
+void coproc_srv_on_system_start(void) {
     Coproc* instance = malloc(sizeof(Coproc));
 
-    instance->queue = furi_message_queue_alloc(COPROC_QUEUE_SIZE, sizeof(uint8_t));
     instance->job_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     instance->next_job_id = 0;
     instance->pending_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
@@ -137,16 +137,6 @@ int32_t coproc_srv(void* p) {
     // so they have no local fallback: coproc_run() returns false without one.
 
     furi_record_create(RECORD_COPROC, instance);
-
-    // Idle forever - this service has no commands of its own; coproc_run()
-    // and friends operate directly on the shared Coproc struct via mutexes
-    // from the calling thread, same as the callback above.
-    uint8_t unused;
-    for(;;) {
-        furi_message_queue_get(instance->queue, &unused, FuriWaitForever);
-    }
-
-    return 0;
 }
 
 bool coproc_is_available(Coproc* instance) {

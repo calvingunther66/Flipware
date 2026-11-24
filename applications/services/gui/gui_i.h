@@ -97,7 +97,11 @@ void gui_input_events_callback(const void* value, void* ctx);
  * @param      gui        The Gui instance
  * @param[in]  layer      GuiLayer that we want to get count of view ports
  */
-size_t gui_active_view_port_count(Gui* gui, GuiLayer layer);
+/** Count enabled view ports on a layer without waiting for the GUI lock.
+ *
+ * @return false (count untouched) if the GUI is busy right now
+ */
+bool gui_try_active_view_port_count(Gui* gui, GuiLayer layer, size_t* count);
 
 /** Lock GUI
  *

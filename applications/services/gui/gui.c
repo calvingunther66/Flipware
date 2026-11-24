@@ -21,12 +21,17 @@ ViewPort* gui_view_port_find_enabled(ViewPortArray_t array) {
     return NULL;
 }
 
-size_t gui_active_view_port_count(Gui* gui, GuiLayer layer) {
+bool gui_try_active_view_port_count(Gui* gui, GuiLayer layer, size_t* count) {
     furi_assert(gui);
     furi_check(layer < GuiLayerMAX);
-    size_t ret = 0;
+    furi_check(count);
 
-    gui_lock(gui);
+    // Called from the timer thread: never wait for the GUI lock there. The GUI
+    // holds it while it sends a frame over the SPI bus it shares with the SD
+    // card, and a blocked timer thread stalls every timer, key releases included.
+    if(furi_mutex_acquire(gui->mutex, 0) != FuriStatusOk) return false;
+
+    size_t ret = 0;
     ViewPortArray_it_t it;
     ViewPortArray_it_last(it, gui->layers[layer]);
     while(!ViewPortArray_end_p(it)) {
@@ -38,7 +43,8 @@ size_t gui_active_view_port_count(Gui* gui, GuiLayer layer) {
     }
     gui_unlock(gui);
 
-    return ret;
+    *count = ret;
+    return true;
 }
 
 void gui_update(Gui* gui) {
