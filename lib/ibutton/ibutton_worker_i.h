@@ -41,6 +41,13 @@ struct iButtonWorker {
     iButtonWorkerWriteCallback write_cb;
     iButtonWorkerEmulateCallback emulate_cb;
 
+    iButtonWriteTargetMask write_target_mask;
+    /** Set once the app calls ibutton_worker_set_write_targets(): only such an app knows
+     *  iButtonWorkerWriteStartTarget, so only it is sent one. */
+    bool write_targets_opted_in;
+    // iButtonWriteTargetMax until a target is attempted; the name is derived, not copied.
+    iButtonWriteTarget write_target;
+
     void* cb_ctx;
 };
 

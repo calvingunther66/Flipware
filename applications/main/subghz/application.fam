@@ -24,6 +24,7 @@ App(
         "!subghz_scene_set_seed.c",
         "!subghz_scene_set_serial.c",
         "!subghz_scene_set_type.c",
+        "!subghz_compare_test.c",
     ],
     requires=["region"],
     resources="resources",

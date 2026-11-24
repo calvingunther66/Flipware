@@ -354,6 +354,14 @@ void subghz_free(SubGhz* subghz, bool alloc_for_tx_only) {
         view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdMenu);
         submenu_free(subghz->submenu);
     }
+    // Compare: only allocated while its scene is open. An exit that skips the scene's
+    // on_exit (loader close, RPC app exit) leaves it registered, and view_dispatcher_free()
+    // checks that every view has been removed.
+    if(subghz->subghz_compare) {
+        view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdCompare);
+        subghz_view_compare_free(subghz->subghz_compare);
+        subghz->subghz_compare = NULL;
+    }
     // Popup
     view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdPopup);
     popup_free(subghz->popup);

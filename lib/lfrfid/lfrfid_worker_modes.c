@@ -521,41 +521,62 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
 
     protocol_dict_get_data(worker->protocols, protocol, verify_data, data_size);
 
-    while(!lfrfid_worker_check_for_stop(worker)) {
+    // Probing modifies the protocol's data, so it has to follow the snapshot above. The loop
+    // restores it before every encode.
+    LFRFIDWriteTargetMask supported = lfrfid_write_targets_supported(worker->protocols, protocol);
+    LFRFIDWriteTargetMask targets = worker->write_target_mask & supported;
+
+    if(targets == 0 && worker->write_cb) {
+        // Which of the two it is decides what the caller can tell the user to do about it.
+        worker->write_cb(
+            supported == 0 ? LFRFIDWorkerWriteProtocolCannotBeWritten :
+                             LFRFIDWorkerWriteNoEnabledTarget,
+            worker->cb_ctx);
+    }
+
+    // Every enabled target is written each pass and then read back once, as before: with every
+    // target enabled (the default) this is exactly the old loop.
+    while(targets != 0 && !lfrfid_worker_check_for_stop(worker)) {
         FURI_LOG_D(TAG, "Data write");
         furi_delay_ms(5); // halt
-        uint16_t skips = 0;
-        for(size_t i = 0; i < LFRFIDWriteTypeMax; i++) {
+        for(LFRFIDWriteTarget target = 0; target < LFRFIDWriteTargetMax; target++) {
+            if(!(targets & LFRFID_WRITE_TARGET_BIT(target))) continue;
+
             memset(request, 0, sizeof(LFRFIDWriteRequest));
-            LFRFIDWriteType write_type = i;
-            request->write_type = write_type;
+            request->write_type = lfrfid_write_target_type(target);
 
             protocol_dict_set_data(worker->protocols, protocol, verify_data, data_size);
 
-            bool can_be_written =
-                protocol_dict_get_write_data(worker->protocols, protocol, request);
-
-            if(!can_be_written) {
-                skips++;
-                if(skips == LFRFIDWriteTypeMax) {
-                    if(worker->write_cb) {
-                        worker->write_cb(LFRFIDWorkerWriteProtocolCannotBeWritten, worker->cb_ctx);
-                    }
-                    break;
-                }
+            // Support depends only on write_type, which is what the probe sampled, so this
+            // holds today. Drop the target rather than write a half-filled request.
+            if(!protocol_dict_get_write_data(worker->protocols, protocol, request)) {
+                FURI_LOG_E(TAG, "Encoding for %s failed", lfrfid_write_target_name(target));
+                targets &= ~LFRFID_WRITE_TARGET_BIT(target);
                 continue;
             }
 
             memset(read_data, 0, data_size);
 
-            if(request->write_type == LFRFIDWriteTypeT5577) {
+            switch(request->write_type) {
+            case LFRFIDWriteTypeT5577:
                 t5577_write(&request->t5577);
-            } else if(request->write_type == LFRFIDWriteTypeEM4305) {
+                break;
+            case LFRFIDWriteTypeEM4305:
                 em4305_write(&request->em4305);
-            } else {
+                break;
+            case LFRFIDWriteTypeMax:
+                // No default, so -Wswitch catches a new write type here too.
                 furi_crash("Unknown write type");
             }
         }
+
+        if(targets == 0) {
+            if(worker->write_cb) {
+                worker->write_cb(LFRFIDWorkerWriteProtocolCannotBeWritten, worker->cb_ctx);
+            }
+            break;
+        }
+
         ProtocolId read_result = PROTOCOL_NO;
         LFRFIDWorkerReadState state = lfrfid_worker_read_internal(
             worker,

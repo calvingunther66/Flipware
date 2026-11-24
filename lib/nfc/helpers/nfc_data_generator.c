@@ -5,6 +5,7 @@
 #include <nfc/protocols/iso14443_3a/iso14443_3a.h>
 #include <nfc/protocols/mf_classic/mf_classic.h>
 #include <nfc/protocols/mf_ultralight/mf_ultralight.h>
+#include <nfc/protocols/texkom/texkom_i.h> // texkom_make_blank(), generator-only
 
 #define NXP_MANUFACTURER_ID (0x04)
 
@@ -436,6 +437,41 @@ static void nfc_generate_mf_classic_4k_7b_uid(NfcDevice* nfc_device) {
     nfc_generate_mf_classic(nfc_device, 7, MfClassicType4k);
 }
 
+/**
+ * @brief Blank key of one Texkom variant, with a random UID.
+ *
+ * There is nothing else to seed: a Texkom frame is the variant markers, the UID and a checksum
+ * over it, and texkom_set_uid() keeps the checksum right.
+ */
+static void nfc_generate_texkom(NfcDevice* nfc_device, TexkomType type) {
+    TexkomData* data = texkom_alloc();
+
+    furi_check(texkom_make_blank(data, type));
+
+    // Only the length is wanted here - the variant decides how long its UID is.
+    size_t uid_len = 0;
+    texkom_get_uid(data, &uid_len);
+
+    uint8_t uid[TEXKOM_UID_SIZE];
+    furi_hal_random_fill_buf(uid, uid_len);
+    furi_check(texkom_set_uid(data, uid, uid_len));
+
+    nfc_device_set_data(nfc_device, NfcProtocolTexkom, data);
+    texkom_free(data);
+}
+
+static void nfc_generate_texkom_tk13(NfcDevice* nfc_device) {
+    nfc_generate_texkom(nfc_device, TexkomTypeTk13);
+}
+
+static void nfc_generate_texkom_tk17(NfcDevice* nfc_device) {
+    nfc_generate_texkom(nfc_device, TexkomTypeTk17);
+}
+
+static void nfc_generate_texkom_mmbit(NfcDevice* nfc_device) {
+    nfc_generate_texkom(nfc_device, TexkomTypeMmbit);
+}
+
 static const NfcDataGenerator nfc_data_generator[NfcDataGeneratorTypeNum] = {
     [NfcDataGeneratorTypeMfUltralight] =
         {
@@ -526,6 +562,22 @@ static const NfcDataGenerator nfc_data_generator[NfcDataGeneratorTypeNum] = {
         {
             .name = "Mifare Classic 4k 7byte UID",
             .handler = nfc_generate_mf_classic_4k_7b_uid,
+        },
+
+    [NfcDataGeneratorTypeTexkomTk13] =
+        {
+            .name = "Texkom TK13",
+            .handler = nfc_generate_texkom_tk13,
+        },
+    [NfcDataGeneratorTypeTexkomTk17] =
+        {
+            .name = "Texkom TK17",
+            .handler = nfc_generate_texkom_tk17,
+        },
+    [NfcDataGeneratorTypeTexkomMmbit] =
+        {
+            .name = "Texkom MMBIT",
+            .handler = nfc_generate_texkom_mmbit,
         },
 };
 
