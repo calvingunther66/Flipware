@@ -43,9 +43,7 @@ void desktop_settings_scene_pin_menu_on_enter(void* context) {
 
     // Host sign-in keys (see documentation/HostAuth.md). Removing keys needs no PIN:
     // it can only take access away.
-    Storage* storage = furi_record_open(RECORD_STORAGE);
-    bool hosts_enrolled = storage_file_exists(storage, HOST_AUTH_KEYS_PATH);
-    furi_record_close(RECORD_STORAGE);
+    bool hosts_enrolled = host_auth_is_enrolled();
     if(hosts_enrolled) {
         submenu_add_item(
             submenu,
@@ -96,9 +94,8 @@ bool desktop_settings_scene_pin_menu_on_event(void* context, SceneManagerEvent e
                 AlignCenter);
             dialog_message_set_buttons(message, "Cancel", NULL, "Forget");
             if(dialog_message_show(app->dialogs, message) == DialogMessageButtonRight) {
-                Storage* storage = furi_record_open(RECORD_STORAGE);
-                storage_simply_remove(storage, HOST_AUTH_KEYS_PATH);
-                furi_record_close(RECORD_STORAGE);
+                // Also invalidates copies in updater backups
+                host_auth_forget_all();
             }
             dialog_message_free(message);
             // Rebuild the menu so the item disappears

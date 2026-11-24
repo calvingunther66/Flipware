@@ -452,6 +452,8 @@ void desktop_unlock(Desktop* desktop) {
     bool with_pin = furi_hal_rtc_is_flag_set(FuriHalRtcFlagLock);
     furi_hal_rtc_reset_flag(FuriHalRtcFlagLock);
     furi_hal_rtc_set_pin_fails(0);
+    // Any unlock, PIN included, ends the host sign-in backoff
+    host_auth_on_unlock();
 
     if(with_pin) {
         if(!momentum_settings.allow_locked_rpc_usb) {

@@ -6,11 +6,13 @@
 #include <furi_hal_bt.h>
 #include <furi_hal_crypto.h>
 #include <furi_hal_random.h>
+#include <furi_hal_rtc.h>
 #include <furi_hal_version.h>
 #include <storage/storage.h>
-#include <dialogs/dialogs.h>
+#include <gui/gui.h>
+#include <gui/view_port.h>
+#include <input/input.h>
 #include <notification/notification_messages.h>
-#include <toolbox/args.h>
 #include <toolbox/cli/cli_command.h>
 #include <toolbox/cli/cli_registry.h>
 #include <cli/cli.h>
@@ -21,32 +23,60 @@
 #define TAG "HostAuth"
 
 #define HOST_AUTH_PATH     HOST_AUTH_KEYS_PATH
-#define HOST_AUTH_TMP_PATH INT_PATH(".hostauth.tmp")
+#define HOST_AUTH_TMP_PATH HOST_AUTH_KEYS_TMP_PATH
 
 #define HOST_AUTH_CLI_STACK  (5 * 1024)
 #define HOST_AUTH_CORE2_WAIT (50) /**< x 100 ms */
 
+#define HOST_AUTH_CONFIRM_TIMEOUT_S (60u)
+
+// The four registers live in the RTC backup domain, next to the PIN fail counter
+_Static_assert(FuriHalRtcRegisterMAX <= 20, "RTC backup registers exhausted");
+
 // CBC-MAC IV. Doubles as domain separation from other users of the unique key.
-static const uint8_t host_auth_mac_iv[16] = "hostauth-mac-v1";
+static const uint8_t host_auth_mac_iv[16] = "hostauth-mac-v2";
 
 typedef enum {
     HostAuthLoadOk,
     HostAuthLoadMissing,
     HostAuthLoadStorage,
     HostAuthLoadEnclave,
-    HostAuthLoadIntegrity,
+    HostAuthLoadIntegrity, /**< Bad length, bad MAC or bad structure */
+    HostAuthLoadRollback, /**< Genuine file, but not the current one */
 } HostAuthLoadResult;
 
 typedef struct {
     FuriMutex* mutex;
     bool challenge_valid;
-    uint8_t nonce[HOST_AUTH_NONCE_LEN];
+    uint8_t binding[HOST_AUTH_BINDING_LEN];
     uint32_t challenge_tick;
-    uint32_t fails;
-    uint32_t blocked_until_tick;
 } HostAuthState;
 
 static HostAuthState* host_auth_state = NULL;
+
+// =============
+// RTC registers
+// =============
+
+static void host_auth_backoff_register_failure(void) {
+    uint32_t fails = furi_hal_rtc_get_register(FuriHalRtcRegisterHostAuthFails);
+    if(fails < UINT32_MAX) fails++;
+    furi_hal_rtc_set_register(FuriHalRtcRegisterHostAuthFails, fails);
+    furi_hal_rtc_set_register(FuriHalRtcRegisterHostAuthFailTime, furi_hal_rtc_get_timestamp());
+    FURI_LOG_W(TAG, "Bad response, %lu failures", (unsigned long)fails);
+}
+
+static uint32_t host_auth_backoff_remaining(void) {
+    uint32_t fails = furi_hal_rtc_get_register(FuriHalRtcRegisterHostAuthFails);
+    uint32_t last = furi_hal_rtc_get_register(FuriHalRtcRegisterHostAuthFailTime);
+    uint32_t clamped = last;
+    uint32_t remaining =
+        host_auth_backoff_remaining_s(fails, last, furi_hal_rtc_get_timestamp(), &clamped);
+    if(clamped != last) {
+        furi_hal_rtc_set_register(FuriHalRtcRegisterHostAuthFailTime, clamped);
+    }
+    return remaining;
+}
 
 // =======
 // Storage
@@ -78,96 +108,144 @@ static bool
     return ok;
 }
 
-static bool host_auth_mac_equal(const uint8_t* a, const uint8_t* b) {
-    uint8_t acc = 0;
-    for(size_t i = 0; i < HOST_AUTH_MAC_LEN; i++)
-        acc |= a[i] ^ b[i];
-    return acc == 0;
-}
-
-static HostAuthLoadResult host_auth_load(HostAuthRecord* record) {
+static HostAuthLoadResult
+    host_auth_read_file(Storage* storage, const char* path, HostAuthRecord* record) {
     memset(record, 0, sizeof(*record));
-    Storage* storage = furi_record_open(RECORD_STORAGE);
-    uint8_t* buf = malloc(HOST_AUTH_FILE_LEN);
-    HostAuthLoadResult result = HostAuthLoadStorage;
+    if(!storage_file_exists(storage, path)) return HostAuthLoadMissing;
 
+    uint8_t* buf = malloc(HOST_AUTH_FILE_LEN);
+    HostAuthLoadResult result = HostAuthLoadIntegrity;
+    File* file = storage_file_alloc(storage);
     do {
-        if(!storage_file_exists(storage, HOST_AUTH_PATH)) {
-            result = HostAuthLoadMissing;
+        if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
+            result = HostAuthLoadStorage;
             break;
         }
-        File* file = storage_file_alloc(storage);
-        bool read_ok = false;
-        if(storage_file_open(file, HOST_AUTH_PATH, FSAM_READ, FSOM_OPEN_EXISTING)) {
-            read_ok = storage_file_read(file, buf, HOST_AUTH_FILE_LEN) == HOST_AUTH_FILE_LEN &&
-                      storage_file_eof(file);
-        }
-        storage_file_close(file);
-        storage_file_free(file);
-        if(!read_ok) {
-            result = HostAuthLoadIntegrity;
-            break;
-        }
+        // Exactly FILE_LEN bytes, nothing more
+        if(storage_file_size(file) != HOST_AUTH_FILE_LEN) break;
+        if(storage_file_read(file, buf, HOST_AUTH_FILE_LEN) != HOST_AUTH_FILE_LEN) break;
 
         uint8_t mac[HOST_AUTH_MAC_LEN];
         if(!host_auth_mac(buf, mac)) {
             result = HostAuthLoadEnclave;
             break;
         }
-        if(!host_auth_mac_equal(mac, buf + HOST_AUTH_RECORD_LEN) ||
-           !host_auth_record_parse(buf, record)) {
-            memset(record, 0, sizeof(*record));
-            result = HostAuthLoadIntegrity;
+        if(!host_auth_ct_equal(mac, buf + HOST_AUTH_RECORD_LEN, HOST_AUTH_MAC_LEN)) break;
+        if(!host_auth_record_parse(buf, record)) break;
+        // Old copies (an updater backup, a file copied back) carry an old epoch
+        if(!host_auth_epoch_matches(
+               record->epoch, furi_hal_rtc_get_register(FuriHalRtcRegisterHostAuthEpoch))) {
+            result = HostAuthLoadRollback;
             break;
         }
         result = HostAuthLoadOk;
     } while(0);
-
+    storage_file_close(file);
+    storage_file_free(file);
+    if(result != HostAuthLoadOk) memset(record, 0, sizeof(*record));
+    memset(buf, 0, HOST_AUTH_FILE_LEN);
     free(buf);
+    return result;
+}
+
+static HostAuthFileState host_auth_file_state(HostAuthLoadResult result) {
+    switch(result) {
+    case HostAuthLoadOk:
+        return HostAuthFileOk;
+    case HostAuthLoadMissing:
+        return HostAuthFileMissing;
+    case HostAuthLoadIntegrity:
+        return HostAuthFileInvalid;
+    case HostAuthLoadRollback:
+        return HostAuthFileStale;
+    default:
+        return HostAuthFileUnreadable;
+    }
+}
+
+static HostAuthLoadResult host_auth_load(HostAuthRecord* record) {
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    HostAuthLoadResult result = host_auth_read_file(storage, HOST_AUTH_PATH, record);
+    HostAuthFileState tmp_state = HostAuthFileMissing;
+    HostAuthRecord* tmp = NULL;
+    if(result != HostAuthLoadOk && storage_file_exists(storage, HOST_AUTH_TMP_PATH)) {
+        tmp = malloc(sizeof(HostAuthRecord));
+        tmp_state = host_auth_file_state(host_auth_read_file(storage, HOST_AUTH_TMP_PATH, tmp));
+    }
+
+    switch(host_auth_load_decide(host_auth_file_state(result), tmp_state)) {
+    case HostAuthLoadUseMain:
+        // Left over from a save that stopped before the epoch moved: stale
+        storage_common_remove(storage, HOST_AUTH_TMP_PATH);
+        break;
+    case HostAuthLoadRecoverTmp:
+        // A save that stopped after the epoch moved but before the rename
+        *record = *tmp;
+        storage_common_remove(storage, HOST_AUTH_PATH);
+        storage_common_rename(storage, HOST_AUTH_TMP_PATH, HOST_AUTH_PATH);
+        FURI_LOG_I(TAG, "Recovered the key file from an interrupted save");
+        result = HostAuthLoadOk;
+        break;
+    default:
+        memset(record, 0, sizeof(*record));
+        break;
+    }
+
+    if(tmp) {
+        memset(tmp, 0, sizeof(*tmp));
+        free(tmp);
+    }
     furi_record_close(RECORD_STORAGE);
     return result;
 }
 
-static bool host_auth_save(const HostAuthRecord* record) {
+/**
+ * Write the record under a fresh epoch. Order matters for crash safety:
+ * 1. write the tmp file with the new epoch (main file still current),
+ * 2. move the epoch register (now only the tmp file is current; load recovers it),
+ * 3. rename tmp over main.
+ * Every save moves the epoch, so every older copy of the file stops loading.
+ */
+static bool host_auth_save(HostAuthRecord* record) {
+    if(record->count == 0) return host_auth_forget_all();
+
+    uint32_t old_epoch = furi_hal_rtc_get_register(FuriHalRtcRegisterHostAuthEpoch);
+    record->epoch = host_auth_new_epoch(old_epoch);
+
     Storage* storage = furi_record_open(RECORD_STORAGE);
-    bool ok = false;
-
-    if(record->count == 0) {
-        storage_common_remove(storage, HOST_AUTH_PATH);
-        ok = !storage_file_exists(storage, HOST_AUTH_PATH);
-        furi_record_close(RECORD_STORAGE);
-        return ok;
-    }
-
     uint8_t* buf = malloc(HOST_AUTH_FILE_LEN);
     host_auth_record_serialize(record, buf);
+    bool ok = false;
     do {
         if(!host_auth_mac(buf, buf + HOST_AUTH_RECORD_LEN)) break;
 
         File* file = storage_file_alloc(storage);
         bool written = false;
         if(storage_file_open(file, HOST_AUTH_TMP_PATH, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
-            written = storage_file_write(file, buf, HOST_AUTH_FILE_LEN) == HOST_AUTH_FILE_LEN;
+            written = storage_file_write(file, buf, HOST_AUTH_FILE_LEN) == HOST_AUTH_FILE_LEN &&
+                      storage_file_sync(file);
         }
         storage_file_close(file);
         storage_file_free(file);
-        if(!written) break;
+        if(!written) {
+            storage_common_remove(storage, HOST_AUTH_TMP_PATH);
+            break;
+        }
+
+        furi_hal_rtc_set_register(FuriHalRtcRegisterHostAuthEpoch, record->epoch);
 
         storage_common_remove(storage, HOST_AUTH_PATH);
+        // If this fails, the next load recovers from the tmp file
         ok = storage_common_rename(storage, HOST_AUTH_TMP_PATH, HOST_AUTH_PATH) == FSE_OK;
     } while(0);
+    if(!ok && furi_hal_rtc_get_register(FuriHalRtcRegisterHostAuthEpoch) == old_epoch) {
+        record->epoch = old_epoch;
+    }
 
-    storage_common_remove(storage, HOST_AUTH_TMP_PATH);
+    memset(buf, 0, HOST_AUTH_FILE_LEN);
     free(buf);
     furi_record_close(RECORD_STORAGE);
     return ok;
-}
-
-bool host_auth_is_enrolled(void) {
-    Storage* storage = furi_record_open(RECORD_STORAGE);
-    bool exists = storage_file_exists(storage, HOST_AUTH_PATH);
-    furi_record_close(RECORD_STORAGE);
-    return exists;
 }
 
 // =======
@@ -190,9 +268,14 @@ static void host_auth_print_load_error(HostAuthLoadResult result) {
         printf("hostauth-error enclave\r\n");
         break;
     case HostAuthLoadIntegrity:
-        // Tampered with, restored from a different device, or the radio core's
-        // key store was reset. Fall back to the PIN and re-enroll.
+        // Edited, copied from another device, or the radio core's key store
+        // was reset. Unlock with the PIN and re-enroll.
         printf("hostauth-error integrity\r\n");
+        break;
+    case HostAuthLoadRollback:
+        // A genuine but outdated copy (restored backup), or the RTC backup
+        // registers were cleared (battery fully drained, factory reset)
+        printf("hostauth-error rollback\r\n");
         break;
     default:
         printf("hostauth-error storage\r\n");
@@ -206,19 +289,135 @@ static void host_auth_format_fp(const uint8_t pubkey[HOST_AUTH_PUBKEY_LEN], char
     host_auth_hex_encode(fp, sizeof(fp), out);
 }
 
-static bool host_auth_read_hex_arg(FuriString* args, uint8_t* out, size_t out_len) {
-    FuriString* word = furi_string_alloc();
-    bool ok =
-        args_read_string_and_trim(args, word) &&
-        host_auth_hex_decode(furi_string_get_cstr(word), furi_string_size(word), out, out_len);
-    furi_string_free(word);
-    return ok;
+static void host_auth_notify(const NotificationSequence* sequence) {
+    NotificationApp* notification = furi_record_open(RECORD_NOTIFICATION);
+    notification_message(notification, sequence);
+    furi_record_close(RECORD_NOTIFICATION);
 }
 
-static void host_auth_notify_failure(void) {
-    NotificationApp* notification = furi_record_open(RECORD_NOTIFICATION);
-    notification_message(notification, &sequence_error);
-    furi_record_close(RECORD_NOTIFICATION);
+static const char* host_auth_verify_error(HostAuthVerifyResult result) {
+    switch(result) {
+    case HostAuthVerifyRpMismatch:
+        return "rp-mismatch";
+    case HostAuthVerifyNoPresence:
+        return "no-presence";
+    case HostAuthVerifyNoVerification:
+        return "no-verification";
+    case HostAuthVerifySynced:
+        return "synced-credential";
+    case HostAuthVerifyBadFlags:
+        return "bad-flags";
+    case HostAuthVerifyCounter:
+        return "counter";
+    default:
+        return "bad-signature";
+    }
+}
+
+// =============================
+// On-device enroll confirmation
+// =============================
+
+typedef enum {
+    HostAuthConfirmEventAccept,
+    HostAuthConfirmEventCancel,
+} HostAuthConfirmEvent;
+
+typedef struct {
+    FuriMessageQueue* queue;
+    char label[HOST_AUTH_LABEL_LEN];
+    char fp[20]; // xxxx-xxxx-xxxx-xxxx
+    bool require_uv;
+    uint32_t seconds_left;
+} HostAuthConfirm;
+
+static void host_auth_confirm_draw(Canvas* canvas, void* context) {
+    HostAuthConfirm* confirm = context;
+    canvas_clear(canvas);
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str_aligned(canvas, 64, 0, AlignCenter, AlignTop, "Enroll this computer?");
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(canvas, 64, 13, AlignCenter, AlignTop, confirm->label);
+    canvas_set_font(canvas, FontKeyboard);
+    canvas_draw_str_aligned(canvas, 64, 25, AlignCenter, AlignTop, confirm->fp);
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(
+        canvas,
+        64,
+        37,
+        AlignCenter,
+        AlignTop,
+        confirm->require_uv ? "Unlocks with biometry/PIN" : "Unlocks with a touch");
+    char footer[40];
+    snprintf(
+        footer,
+        sizeof(footer),
+        "Hold OK: enroll  Back: no (%lus)",
+        (unsigned long)confirm->seconds_left);
+    canvas_draw_str_aligned(canvas, 64, 63, AlignCenter, AlignBottom, footer);
+}
+
+static void host_auth_confirm_input(InputEvent* event, void* context) {
+    HostAuthConfirm* confirm = context;
+    // Only the physical buttons count: RPC, `input send` and the Video Game
+    // Module all inject events marked as software
+    if(event->sequence_source != INPUT_SEQUENCE_SOURCE_HARDWARE) return;
+
+    HostAuthConfirmEvent out;
+    if(event->key == InputKeyOk && event->type == InputTypeLong) {
+        out = HostAuthConfirmEventAccept;
+    } else if(event->key == InputKeyBack && event->type == InputTypeShort) {
+        out = HostAuthConfirmEventCancel;
+    } else {
+        return;
+    }
+    furi_message_queue_put(confirm->queue, &out, 0);
+}
+
+static bool host_auth_confirm_enroll(const HostAuthKey* key) {
+    HostAuthConfirm* confirm = malloc(sizeof(HostAuthConfirm));
+    confirm->queue = furi_message_queue_alloc(4, sizeof(HostAuthConfirmEvent));
+    strlcpy(confirm->label, key->label, sizeof(confirm->label));
+    char fp_hex[17];
+    host_auth_format_fp(key->pubkey, fp_hex);
+    snprintf(
+        confirm->fp,
+        sizeof(confirm->fp),
+        "%.4s-%.4s-%.4s-%.4s",
+        fp_hex,
+        fp_hex + 4,
+        fp_hex + 8,
+        fp_hex + 12);
+    confirm->require_uv = key->flags & HOST_AUTH_KEY_REQUIRE_UV;
+    confirm->seconds_left = HOST_AUTH_CONFIRM_TIMEOUT_S;
+
+    ViewPort* view_port = view_port_alloc();
+    view_port_draw_callback_set(view_port, host_auth_confirm_draw, confirm);
+    view_port_input_callback_set(view_port, host_auth_confirm_input, confirm);
+    Gui* gui = furi_record_open(RECORD_GUI);
+    gui_add_view_port(gui, view_port, GuiLayerFullscreen);
+    gui_view_port_send_to_front(gui, view_port);
+    host_auth_notify(&sequence_display_backlight_on);
+    host_auth_notify(&sequence_single_vibro);
+
+    bool accepted = false;
+    while(confirm->seconds_left > 0) {
+        HostAuthConfirmEvent event;
+        if(furi_message_queue_get(confirm->queue, &event, 1000) == FuriStatusOk) {
+            accepted = event == HostAuthConfirmEventAccept;
+            break;
+        }
+        confirm->seconds_left--;
+        view_port_update(view_port);
+    }
+
+    view_port_enabled_set(view_port, false);
+    gui_remove_view_port(gui, view_port);
+    furi_record_close(RECORD_GUI);
+    view_port_free(view_port);
+    furi_message_queue_free(confirm->queue);
+    free(confirm);
+    return accepted;
 }
 
 // ===========
@@ -233,8 +432,10 @@ static void host_auth_cmd_info(void) {
     HostAuthRecord* record = malloc(sizeof(HostAuthRecord));
     HostAuthLoadResult result = host_auth_load(record);
     printf(
-        "hostauth-info v=1 uid=%s locked=%d pin=%d keys=%u status=%s\r\n",
+        "hostauth-info v=%u uid=%s rp=%s locked=%d pin=%d keys=%u status=%s\r\n",
+        (unsigned)HOST_AUTH_PROTOCOL_VERSION,
         uid_hex,
+        HOST_AUTH_RP_ID,
         locked,
         desktop_pin_code_is_set(),
         result == HostAuthLoadOk ? record->count : 0u,
@@ -242,12 +443,16 @@ static void host_auth_cmd_info(void) {
         result == HostAuthLoadMissing ? "none" :
                                         "error");
 
-    // Labels stay private while locked
+    // Labels and fingerprints stay private while locked
     if(!locked && result == HostAuthLoadOk) {
         for(uint8_t i = 0; i < record->count; i++) {
             char fp_hex[17];
             host_auth_format_fp(record->keys[i].pubkey, fp_hex);
-            printf("hostauth-key fp=%s label=%s\r\n", fp_hex, record->keys[i].label);
+            printf(
+                "hostauth-key fp=%s uv=%u label=%s\r\n",
+                fp_hex,
+                (unsigned)(record->keys[i].flags & HOST_AUTH_KEY_REQUIRE_UV),
+                record->keys[i].label);
         }
     }
     free(record);
@@ -256,96 +461,132 @@ static void host_auth_cmd_info(void) {
 static void host_auth_cmd_challenge(void) {
     HostAuthState* state = host_auth_state;
     furi_check(furi_mutex_acquire(state->mutex, FuriWaitForever) == FuriStatusOk);
+    // A new request always kills the outstanding challenge
+    state->challenge_valid = false;
+    memset(state->binding, 0, sizeof(state->binding));
 
-    uint32_t now = furi_get_tick();
-    int32_t wait_ticks = (int32_t)(state->blocked_until_tick - now);
-    if(state->fails >= HOST_AUTH_FREE_FAILS && wait_ticks > 0) {
+    do {
+        uint32_t remaining = host_auth_backoff_remaining();
+        if(remaining > 0) {
+            printf("hostauth-error backoff s=%lu\r\n", (unsigned long)remaining);
+            break;
+        }
+
+        uint32_t counter = furi_hal_rtc_get_register(FuriHalRtcRegisterHostAuthCounter);
+        if(counter == UINT32_MAX) {
+            printf("hostauth-error counter-exhausted\r\n");
+            break;
+        }
+        counter++;
+        // Persist before use: a counter value is never handed out twice
+        furi_hal_rtc_set_register(FuriHalRtcRegisterHostAuthCounter, counter);
+
+        uint8_t nonce[HOST_AUTH_NONCE_LEN];
+        furi_hal_random_fill_buf(nonce, sizeof(nonce));
+        host_auth_binding_build(
+            state->binding,
+            HostAuthActionUnlock,
+            furi_hal_version_uid(),
+            furi_hal_rtc_get_register(FuriHalRtcRegisterHostAuthEpoch),
+            counter,
+            nonce);
+        memset(nonce, 0, sizeof(nonce));
+        state->challenge_tick = furi_get_tick();
+        state->challenge_valid = true;
+
+        char challenge[HOST_AUTH_CHALLENGE_B64_LEN + 1];
+        host_auth_base64url_encode(state->binding, HOST_AUTH_BINDING_LEN, challenge);
         printf(
-            "hostauth-error backoff s=%lu\r\n",
-            (unsigned long)((furi_kernel_get_tick_frequency() - 1 + (uint32_t)wait_ticks) /
-                            furi_kernel_get_tick_frequency()));
-        furi_mutex_release(state->mutex);
-        return;
-    }
+            "hostauth-challenge v=%u rp=%s challenge=%s ttl=%u\r\n",
+            (unsigned)HOST_AUTH_PROTOCOL_VERSION,
+            HOST_AUTH_RP_ID,
+            challenge,
+            (unsigned)(HOST_AUTH_CHALLENGE_TTL_MS / 1000));
+    } while(0);
 
-    furi_hal_random_fill_buf(state->nonce, HOST_AUTH_NONCE_LEN);
-    state->challenge_tick = now;
-    state->challenge_valid = true;
-
-    char uid_hex[2 * HOST_AUTH_UID_LEN + 1];
-    char nonce_hex[2 * HOST_AUTH_NONCE_LEN + 1];
-    host_auth_hex_encode(furi_hal_version_uid(), HOST_AUTH_UID_LEN, uid_hex);
-    host_auth_hex_encode(state->nonce, HOST_AUTH_NONCE_LEN, nonce_hex);
     furi_mutex_release(state->mutex);
-
-    printf(
-        "hostauth-challenge v=1 action=unlock uid=%s nonce=%s ttl=%u\r\n",
-        uid_hex,
-        nonce_hex,
-        (unsigned)(HOST_AUTH_CHALLENGE_TTL_MS / 1000));
 }
 
-static void host_auth_register_failure(HostAuthState* state) {
-    state->fails++;
-    uint32_t backoff_ms = host_auth_backoff_s(state->fails) * 1000;
-    state->blocked_until_tick = furi_get_tick() + furi_ms_to_ticks(backoff_ms);
-    FURI_LOG_W(TAG, "Bad response, %lu failures", (unsigned long)state->fails);
-}
-
-static void host_auth_cmd_response(FuriString* args) {
+/** Take the outstanding challenge (single use). Returns false if there is none. */
+static bool host_auth_take_challenge(uint8_t binding[HOST_AUTH_BINDING_LEN], bool* expired) {
     HostAuthState* state = host_auth_state;
-    uint8_t sig[HOST_AUTH_SIG_LEN];
-    bool sig_ok = host_auth_read_hex_arg(args, sig, sizeof(sig));
-
     furi_check(furi_mutex_acquire(state->mutex, FuriWaitForever) == FuriStatusOk);
-    if(!state->challenge_valid) {
-        furi_mutex_release(state->mutex);
+    bool valid = state->challenge_valid;
+    if(valid) {
+        memcpy(binding, state->binding, HOST_AUTH_BINDING_LEN);
+        *expired = furi_get_tick() - state->challenge_tick >
+                   furi_ms_to_ticks(HOST_AUTH_CHALLENGE_TTL_MS);
+    }
+    state->challenge_valid = false;
+    memset(state->binding, 0, sizeof(state->binding));
+    furi_mutex_release(state->mutex);
+    return valid;
+}
+
+/** A `response` line that did not parse still uses up the challenge. */
+static void host_auth_cmd_response_malformed(void) {
+    uint8_t binding[HOST_AUTH_BINDING_LEN];
+    bool expired = false;
+    if(host_auth_take_challenge(binding, &expired)) {
+        host_auth_backoff_register_failure();
+        memset(binding, 0, sizeof(binding));
+    }
+    printf("hostauth-error usage\r\n");
+}
+
+static void host_auth_cmd_response(const HostAuthCommand* cmd) {
+    uint8_t binding[HOST_AUTH_BINDING_LEN];
+    bool expired = false;
+    if(!host_auth_take_challenge(binding, &expired)) {
         printf("hostauth-error no-challenge\r\n");
         return;
     }
-    // One response per challenge, whatever happens next
-    state->challenge_valid = false;
-    uint8_t nonce[HOST_AUTH_NONCE_LEN];
-    memcpy(nonce, state->nonce, sizeof(nonce));
-    memset(state->nonce, 0, sizeof(state->nonce));
-    bool expired = furi_get_tick() - state->challenge_tick >
-                   furi_ms_to_ticks(HOST_AUTH_CHALLENGE_TTL_MS);
-
-    if(expired || !sig_ok) {
-        host_auth_register_failure(state);
-        furi_mutex_release(state->mutex);
-        printf(expired ? "hostauth-error expired\r\n" : "hostauth-error usage\r\n");
+    if(expired) {
+        host_auth_backoff_register_failure();
+        printf("hostauth-error expired\r\n");
         return;
     }
-    furi_mutex_release(state->mutex);
 
     HostAuthRecord* record = malloc(sizeof(HostAuthRecord));
-    HostAuthLoadResult result = host_auth_load(record);
-    int signer = -1;
-    if(result == HostAuthLoadOk) {
-        uint8_t msg[HOST_AUTH_MESSAGE_LEN];
-        host_auth_message_build(msg, HostAuthActionUnlock, furi_hal_version_uid(), nonce);
-        signer = host_auth_record_find_signer(record, msg, sizeof(msg), sig);
-    }
+    do {
+        HostAuthLoadResult load = host_auth_load(record);
+        if(load != HostAuthLoadOk) {
+            host_auth_print_load_error(load);
+            break;
+        }
 
-    furi_check(furi_mutex_acquire(state->mutex, FuriWaitForever) == FuriStatusOk);
-    if(signer >= 0) {
-        state->fails = 0;
-        state->blocked_until_tick = 0;
-    } else if(result == HostAuthLoadOk) {
-        host_auth_register_failure(state);
-    }
-    furi_mutex_release(state->mutex);
+        int signer = -1;
+        uint32_t new_count = 0;
+        HostAuthVerifyResult result = host_auth_verify_assertion(
+            record,
+            binding,
+            cmd->response.auth_data,
+            cmd->response.r,
+            cmd->response.s,
+            &signer,
+            &new_count);
+        if(result != HostAuthVerifyOk) {
+            host_auth_backoff_register_failure();
+            printf("hostauth-error %s\r\n", host_auth_verify_error(result));
+            host_auth_notify(&sequence_error);
+            break;
+        }
 
-    if(result != HostAuthLoadOk) {
-        host_auth_print_load_error(result);
-    } else if(signer < 0) {
-        printf("hostauth-error bad-signature\r\n");
-        host_auth_notify_failure();
-    } else {
+        HostAuthKey* key = &record->keys[signer];
+        if(new_count != key->sign_count) {
+            // Persist the counter before unlocking, or a cloned authenticator
+            // could replay an older count after a reboot
+            key->sign_count = new_count;
+            if(!host_auth_save(record)) {
+                printf("hostauth-error storage\r\n");
+                break;
+            }
+        }
+
+        host_auth_backoff_clear();
         char fp_hex[17];
-        host_auth_format_fp(record->keys[signer].pubkey, fp_hex);
-        FURI_LOG_I(TAG, "Signed in: %s", record->keys[signer].label);
+        host_auth_format_fp(key->pubkey, fp_hex);
+        FURI_LOG_I(TAG, "Signed in: %s", key->label);
         Desktop* desktop = furi_record_open(RECORD_DESKTOP);
         if(desktop_api_is_locked(desktop)) {
             // Print first: unlocking restarts this shell in full mode
@@ -356,56 +597,23 @@ static void host_auth_cmd_response(FuriString* args) {
             printf("hostauth-ok verified fp=%s\r\n", fp_hex);
         }
         furi_record_close(RECORD_DESKTOP);
-    }
+    } while(0);
+    memset(binding, 0, sizeof(binding));
     free(record);
 }
 
-static bool host_auth_confirm_enroll(const HostAuthKey* key) {
-    char fp_hex[17];
-    host_auth_format_fp(key->pubkey, fp_hex);
-    FuriString* text = furi_string_alloc_printf(
-        "%.20s\n%.4s-%.4s-%.4s-%.4s\nUnlocks this Flipper",
-        key->label,
-        fp_hex,
-        fp_hex + 4,
-        fp_hex + 8,
-        fp_hex + 12);
-
-    DialogsApp* dialogs = furi_record_open(RECORD_DIALOGS);
-    DialogMessage* message = dialog_message_alloc();
-    dialog_message_set_header(message, "Enroll computer?", 64, 0, AlignCenter, AlignTop);
-    dialog_message_set_text(message, furi_string_get_cstr(text), 64, 32, AlignCenter, AlignCenter);
-    dialog_message_set_buttons(message, "Cancel", NULL, "Enroll");
-    DialogMessageButton button = dialog_message_show(dialogs, message);
-    dialog_message_free(message);
-    furi_record_close(RECORD_DIALOGS);
-    furi_string_free(text);
-    return button == DialogMessageButtonRight;
-}
-
-static void host_auth_cmd_enroll(FuriString* args) {
-    if(host_auth_device_locked()) {
-        printf("hostauth-error locked\r\n");
-        return;
-    }
-    uint8_t pubkey[HOST_AUTH_PUBKEY_LEN];
-    if(!host_auth_read_hex_arg(args, pubkey, sizeof(pubkey))) {
-        printf("hostauth-error usage\r\n");
-        return;
-    }
-    // The rest of the line is the label
-    furi_string_trim(args);
-
+static void host_auth_cmd_enroll(const HostAuthCommand* cmd) {
     HostAuthRecord* record = malloc(sizeof(HostAuthRecord));
     do {
         HostAuthLoadResult result = host_auth_load(record);
         if(result != HostAuthLoadOk && result != HostAuthLoadMissing) {
-            // Don't silently overwrite a record we can't verify; revoke all first
+            // Don't silently replace a record we can't verify; revoke all first
             host_auth_print_load_error(result);
             break;
         }
 
-        HostAuthAddResult add = host_auth_record_add(record, pubkey, furi_string_get_cstr(args));
+        HostAuthAddResult add = host_auth_record_add(
+            record, cmd->enroll.pubkey, cmd->enroll.require_uv, cmd->enroll.label);
         if(add == HostAuthAddInvalidKey) {
             printf("hostauth-error invalid-key\r\n");
             break;
@@ -418,10 +626,17 @@ static void host_auth_cmd_enroll(FuriString* args) {
         }
 
         // A key that unlocks the device is only added with a press on the device
-        printf("hostauth-pending confirm-on-device\r\n");
+        char fp_hex[17];
+        host_auth_format_fp(cmd->enroll.pubkey, fp_hex);
+        printf("hostauth-pending confirm-on-device fp=%s\r\n", fp_hex);
         fflush(stdout);
         if(!host_auth_confirm_enroll(&record->keys[record->count - 1])) {
             printf("hostauth-error cancelled\r\n");
+            break;
+        }
+        // The device may have been locked while the prompt was up
+        if(host_auth_device_locked()) {
+            printf("hostauth-error locked\r\n");
             break;
         }
         if(!host_auth_save(record)) {
@@ -429,8 +644,6 @@ static void host_auth_cmd_enroll(FuriString* args) {
             break;
         }
 
-        char fp_hex[17];
-        host_auth_format_fp(pubkey, fp_hex);
         printf("hostauth-ok enrolled fp=%s\r\n", fp_hex);
         if(!desktop_pin_code_is_set()) {
             printf("hostauth-note no-pin\r\n");
@@ -439,80 +652,80 @@ static void host_auth_cmd_enroll(FuriString* args) {
     free(record);
 }
 
-static void host_auth_cmd_revoke(FuriString* args) {
-    if(host_auth_device_locked()) {
-        printf("hostauth-error locked\r\n");
+static void host_auth_cmd_revoke(const HostAuthCommand* cmd) {
+    if(cmd->revoke.all) {
+        // Works even if the record fails its integrity check
+        printf(
+            host_auth_forget_all() ? "hostauth-ok revoked all\r\n" : "hostauth-error storage\r\n");
         return;
     }
-    FuriString* word = furi_string_alloc();
-    do {
-        if(!args_read_string_and_trim(args, word)) {
-            printf("hostauth-error usage\r\n");
-            break;
-        }
-        if(furi_string_equal(word, "all")) {
-            // Works even if the record fails its integrity check
-            Storage* storage = furi_record_open(RECORD_STORAGE);
-            storage_common_remove(storage, HOST_AUTH_PATH);
-            bool gone = !storage_file_exists(storage, HOST_AUTH_PATH);
-            furi_record_close(RECORD_STORAGE);
-            printf(gone ? "hostauth-ok revoked all\r\n" : "hostauth-error storage\r\n");
-            break;
-        }
 
-        uint8_t fp[HOST_AUTH_FINGERPRINT_LEN];
-        if(!host_auth_hex_decode(
-               furi_string_get_cstr(word), furi_string_size(word), fp, sizeof(fp))) {
-            printf("hostauth-error usage\r\n");
-            break;
-        }
-        HostAuthRecord* record = malloc(sizeof(HostAuthRecord));
-        HostAuthLoadResult result = host_auth_load(record);
-        if(result != HostAuthLoadOk) {
-            host_auth_print_load_error(result);
-        } else if(!host_auth_record_remove(record, fp)) {
-            printf("hostauth-error not-found\r\n");
-        } else if(!host_auth_save(record)) {
-            printf("hostauth-error storage\r\n");
-        } else {
-            printf("hostauth-ok revoked n=1\r\n");
-        }
-        free(record);
-    } while(0);
-    furi_string_free(word);
+    HostAuthRecord* record = malloc(sizeof(HostAuthRecord));
+    HostAuthLoadResult result = host_auth_load(record);
+    if(result != HostAuthLoadOk) {
+        host_auth_print_load_error(result);
+    } else if(!host_auth_record_remove(record, cmd->revoke.fp)) {
+        printf("hostauth-error not-found\r\n");
+    } else if(!host_auth_save(record)) {
+        printf("hostauth-error storage\r\n");
+    } else {
+        printf("hostauth-ok revoked n=1 left=%u\r\n", (unsigned)record->count);
+    }
+    free(record);
 }
 
 static void host_auth_print_usage(void) {
     printf("Usage:\r\n"
            "hostauth info\r\n"
            "hostauth challenge\r\n"
-           "hostauth response <signature:128 hex, r||s>\r\n"
-           "hostauth enroll <pubkey:130 hex, 04||X||Y> <label>   (unlocked only)\r\n"
-           "hostauth revoke <fingerprint:16 hex|all>             (unlocked only)\r\n");
+           "hostauth response <authenticatorData:74 hex> <signature:DER hex>\r\n"
+           "hostauth enroll <pubkey:130 hex> <uv:0|1> <label>   (unlocked only)\r\n"
+           "hostauth revoke <fingerprint:16 hex|all>           (unlocked only)\r\n");
 }
 
 static void host_auth_cli(PipeSide* pipe, FuriString* args, void* context) {
     UNUSED(pipe);
     UNUSED(context);
-    FuriString* cmd = furi_string_alloc();
 
-    if(!args_read_string_and_trim(args, cmd)) {
-        host_auth_print_usage();
-    } else if(furi_string_equal(cmd, "info")) {
-        host_auth_cmd_info();
-    } else if(furi_string_equal(cmd, "challenge")) {
-        host_auth_cmd_challenge();
-    } else if(furi_string_equal(cmd, "response")) {
-        host_auth_cmd_response(args);
-    } else if(furi_string_equal(cmd, "enroll")) {
-        host_auth_cmd_enroll(args);
-    } else if(furi_string_equal(cmd, "revoke")) {
-        host_auth_cmd_revoke(args);
+    HostAuthCommand* cmd = malloc(sizeof(HostAuthCommand));
+    const char* text = furi_string_get_cstr(args);
+    size_t len = furi_string_size(args);
+    if(!host_auth_parse_command(text, len, cmd)) {
+        if(len >= 8 && memcmp(text, "response", 8) == 0) {
+            host_auth_cmd_response_malformed();
+        } else {
+            host_auth_print_usage();
+        }
+    } else if(
+        (cmd->type == HostAuthCmdEnroll || cmd->type == HostAuthCmdRevoke) &&
+        host_auth_device_locked()) {
+        // Changing the key list needs an unlocked device
+        printf("hostauth-error locked\r\n");
     } else {
-        host_auth_print_usage();
+        switch(cmd->type) {
+        case HostAuthCmdInfo:
+            host_auth_cmd_info();
+            break;
+        case HostAuthCmdChallenge:
+            host_auth_cmd_challenge();
+            break;
+        case HostAuthCmdResponse:
+            host_auth_cmd_response(cmd);
+            break;
+        case HostAuthCmdEnroll:
+            host_auth_cmd_enroll(cmd);
+            break;
+        case HostAuthCmdRevoke:
+            host_auth_cmd_revoke(cmd);
+            break;
+        default:
+            host_auth_print_usage();
+            break;
+        }
     }
 
-    furi_string_free(cmd);
+    memset(cmd, 0, sizeof(*cmd));
+    free(cmd);
 }
 
 void host_auth_init(void) {
@@ -521,16 +734,19 @@ void host_auth_init(void) {
     host_auth_state->mutex = furi_mutex_alloc(FuriMutexTypeNormal);
 
 #ifdef SRV_CLI
+    // Not CliCommandFlagParallelSafe: the shell takes the loader lock, so the
+    // command never runs (and never needs its stack and the ECDSA working
+    // memory) while an app such as Sub-GHz is holding most of the heap.
     CliRegistry* registry = furi_record_open(RECORD_CLI);
     cli_registry_add_command_ex(
-        registry, "hostauth", CliCommandFlagParallelSafe, host_auth_cli, NULL, HOST_AUTH_CLI_STACK);
+        registry, "hostauth", CliCommandFlagDefault, host_auth_cli, NULL, HOST_AUTH_CLI_STACK);
     furi_record_close(RECORD_CLI);
 
     CliVcp* cli_vcp = furi_record_open(RECORD_CLI_VCP);
     cli_registry_add_command_ex(
         cli_vcp_get_locked_registry(cli_vcp),
         "hostauth",
-        CliCommandFlagParallelSafe,
+        CliCommandFlagDefault,
         host_auth_cli,
         NULL,
         HOST_AUTH_CLI_STACK);
