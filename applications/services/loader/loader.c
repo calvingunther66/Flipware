@@ -406,6 +406,25 @@ static const FlipperInternalApplication* loader_find_application_by_name(const c
     return NULL;
 }
 
+// Room the app thread needs beyond its stack: the thread object, its name and
+// the first allocations the app makes before it can show anything.
+#define LOADER_APP_HEAP_MARGIN (1024U)
+
+static bool loader_has_memory_for_stack(Loader* loader, size_t stack_size) {
+    if(memmgr_heap_get_max_free_block() >= stack_size + LOADER_APP_HEAP_MARGIN) return true;
+
+    // Asset packs are only icons and fonts; drop them for this app (they are
+    // reloaded when it exits) rather than reboot on an out-of-memory crash.
+    if(!loader->app.unloaded_asset_packs) {
+        FURI_LOG_W(TAG, "Low memory, unloading asset packs");
+        loader->app.unloaded_asset_packs = true;
+        asset_packs_free();
+        if(memmgr_heap_get_max_free_block() >= stack_size + LOADER_APP_HEAP_MARGIN) return true;
+    }
+
+    return false;
+}
+
 static void loader_start_app_thread(Loader* loader, FlipperApplicationFlag flags) {
     // setup heap trace
     FuriHalRtcHeapTrackMode mode = furi_hal_rtc_get_heap_track_mode();
@@ -431,7 +450,7 @@ static void loader_start_app_thread(Loader* loader, FlipperApplicationFlag flags
     furi_thread_start(loader->app.thread);
 }
 
-static void loader_start_internal_app(
+static bool loader_start_internal_app(
     Loader* loader,
     const FlipperInternalApplication* app,
     const char* args) {
@@ -441,6 +460,14 @@ static void loader_start_internal_app(
         asset_packs_free();
     } else {
         loader->app.unloaded_asset_packs = false;
+    }
+
+    if(!loader_has_memory_for_stack(loader, app->stack_size)) {
+        if(loader->app.unloaded_asset_packs) {
+            loader->app.unloaded_asset_packs = false;
+            asset_packs_init();
+        }
+        return false;
     }
 
     // store args
@@ -454,6 +481,7 @@ static void loader_start_internal_app(
     furi_thread_set_appid(loader->app.thread, app->appid);
 
     loader_start_app_thread(loader, app->flags);
+    return true;
 }
 
 static void loader_log_status_error(
@@ -549,6 +577,22 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
                 asset_packs_free();
             }
             preload_res = flipper_application_preload(loader->app.fap, path);
+
+            // Sections didn't fit: retry once with asset packs unloaded (they
+            // come back when the app exits) instead of failing the launch.
+            if(preload_res == FlipperApplicationPreloadStatusNotEnoughMemory &&
+               !loader->app.unloaded_asset_packs) {
+                FURI_LOG_W(TAG, "Low memory, retrying without asset packs");
+                flipper_application_free(loader->app.fap);
+                loader->app.unloaded_asset_packs = true;
+                asset_packs_free();
+                loader->app.fap = flipper_application_alloc(storage, firmware_api_interface);
+                preload_res = flipper_application_preload_manifest(loader->app.fap, path);
+                if(preload_res != FlipperApplicationPreloadStatusInvalidFile &&
+                   preload_res != FlipperApplicationPreloadStatusInvalidManifest) {
+                    preload_res = flipper_application_preload(loader->app.fap, path);
+                }
+            }
         }
 
         bool api_mismatch = false;
@@ -617,6 +661,18 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
         if(flipper_application_is_plugin(loader->app.fap)) {
             result.value = loader_make_status_error(
                 LoaderStatusErrorInternal, error_message, "Plugin %s is not runnable", path);
+            break;
+        }
+
+        const size_t stack_size = flipper_application_get_manifest(loader->app.fap)->stack_size;
+        if(!loader_has_memory_for_stack(loader, stack_size)) {
+            result.value = loader_make_status_error(
+                LoaderStatusErrorInternal,
+                error_message,
+                "Not enough memory for %s (stack %zu)",
+                path,
+                stack_size);
+            result.error = LoaderStatusErrorOutOfMemory;
             break;
         }
 
@@ -735,8 +791,16 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
         {
             const FlipperInternalApplication* app = loader_find_application_by_name(name);
             if(app) {
-                loader_start_internal_app(loader, app, args);
-                status.value = loader_make_success_status(error_message);
+                if(loader_start_internal_app(loader, app, args)) {
+                    status.value = loader_make_success_status(error_message);
+                } else {
+                    status.value = loader_make_status_error(
+                        LoaderStatusErrorInternal,
+                        error_message,
+                        "Not enough memory to start %s",
+                        name);
+                    status.error = LoaderStatusErrorOutOfMemory;
+                }
                 break;
             }
         }
@@ -764,7 +828,11 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
             LoaderStatusErrorUnknownApp, error_message, "Application \"%s\" not found", name);
     } while(false);
 
-    if(status.value == LoaderStatusOk) {
+    // Only a started app thread frees launch_path (loader_do_app_closed);
+    // opening the Apps browser starts none, so storing it there leaked it.
+    if(status.value == LoaderStatusOk && loader->app.thread &&
+       loader->app.thread != (FuriThread*)LOADER_MAGIC_THREAD_VALUE) {
+        if(loader->app.launch_path) furi_string_free(loader->app.launch_path);
         loader->app.launch_path = furi_string_alloc_set_str(name);
     }
 
@@ -863,7 +931,10 @@ static void loader_do_app_closed(Loader* loader) {
         loader->app.thread = NULL;
     }
 
-    furi_string_free(loader->app.launch_path);
+    if(loader->app.launch_path) {
+        furi_string_free(loader->app.launch_path);
+        loader->app.launch_path = NULL;
+    }
 
     FURI_LOG_I(TAG, "Application stopped. Free heap: %zu", memmgr_get_free_heap());
 
