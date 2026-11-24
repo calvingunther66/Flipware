@@ -235,6 +235,44 @@ def make_cc_icon():
     img.save(CC_ICON)
 
 
+# Boot/updater logo: 9-row capitals with 2px stems, in the style of the
+# Momentum logo it replaces (top 5 rows upright, bottom 4 stepped right by 1).
+BOOT = {
+    "F": ["######", "######", "##....", "####..", "####..", "##....", "##....", "##....", "##...."],
+    "L": ["##....", "##....", "##....", "##....", "##....", "##....", "##....", "######", "######"],
+    "I": ["######", "######", "..##..", "..##..", "..##..", "..##..", "..##..", "######", "######"],
+    "P": ["#####.", "######", "##..##", "##..##", "######", "#####.", "##....", "##....", "##...."],
+    "W": ["##.##.##"] * 7 + ["########", ".######."],
+    "A": [".####.", "######", "##..##", "##..##", "######", "######", "##..##", "##..##", "##..##"],
+    "R": ["#####.", "######", "##..##", "##..##", "#####.", "####..", "##.##.", "##..##", "##..##"],
+    "E": ["######", "######", "##....", "####..", "####..", "##....", "##....", "######", "######"],
+}
+
+
+def make_boot_logo():
+    # Updating_Logo_62x15: drawn on the boot screen (furi/flipper.c) and the
+    # updater's install screen. Wordmark on top; the small "FIRMWARE" text is
+    # kept from the old logo, centred between two rules like the update splash.
+    path = ROOT / "assets/icons/Update/Updating_Logo_62x15.png"
+    old = Image.open(path).convert("1")
+    assert old.size == (62, 15)
+    firmware = old.crop((29, 10, 62, 15))  # the old logo's "FIRMWARE" text
+    img = Image.new("1", (62, 15), WHITE)
+    text = "FLIPWARE"
+    w = sum(len(BOOT[c][0]) for c in text) + len(text) - 1 + 1  # +1 for the step
+    x = (62 - w) // 2
+    for c in text:
+        rows = BOOT[c]
+        blit(img, rows[:5], x, 0)
+        blit(img, rows[5:], x + 1, 5)
+        x += len(rows[0]) + 1
+    fx = (62 - firmware.width) // 2
+    img.paste(firmware, (fx, 10))
+    fill(img, (0, 12, fx - 2, 13), BLACK)
+    fill(img, (fx + firmware.width + 2, 12, 62, 13), BLACK)
+    img.save(path)
+
+
 def make_readme_logo():
     # Wordmark at 2x, then scaled 6x for the README (light and dark).
     w = big_width("FLIPWARE", 2)
@@ -253,8 +291,18 @@ def make_readme_logo():
 
 
 if __name__ == "__main__":
-    make_readme_logo()
-    make_slides()
-    make_update_splash()
-    make_menu_icon()
-    make_cc_icon()
+    import sys
+
+    # No arguments: run every generator. Otherwise name the ones to run,
+    # e.g. `flipware_branding.py boot_logo` (the slide and splash edits are
+    # one-shot, so re-run only what you need).
+    steps = {
+        "readme_logo": make_readme_logo,
+        "slides": make_slides,
+        "update_splash": make_update_splash,
+        "menu_icon": make_menu_icon,
+        "cc_icon": make_cc_icon,
+        "boot_logo": make_boot_logo,
+    }
+    for name in sys.argv[1:] or steps:
+        steps[name]()
