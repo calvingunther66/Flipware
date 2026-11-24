@@ -235,8 +235,8 @@ __attribute__((unused)) static const char* elf_reloc_type_to_str(int symt) {
  * a 24-byte heap block for 10 bytes of code and scatters hundreds of tiny
  * blocks across the heap; pack them into slabs instead. The ldr literal in
  * the trampoline needs each one 4-byte aligned, hence the 12-byte stride. */
-#define TRAMPOLINE_STRIDE        12
-#define TRAMPOLINES_PER_SLAB     32
+#define TRAMPOLINE_STRIDE    12
+#define TRAMPOLINES_PER_SLAB 32
 
 typedef struct ELFTrampolineSlab {
     struct ELFTrampolineSlab* next;
