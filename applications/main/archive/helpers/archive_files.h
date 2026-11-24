@@ -73,9 +73,10 @@ static void ArchiveFile_t_set(ArchiveFile_t* obj, const ArchiveFile_t* src) {
     furi_string_set(obj->path, src->path);
     obj->type = src->type;
     if(src->custom_icon_data) {
-        obj->custom_icon_data = malloc(FAP_MANIFEST_MAX_ICON_SIZE);
+        if(!obj->custom_icon_data) obj->custom_icon_data = malloc(FAP_MANIFEST_MAX_ICON_SIZE);
         memcpy(obj->custom_icon_data, src->custom_icon_data, FAP_MANIFEST_MAX_ICON_SIZE);
     } else {
+        free(obj->custom_icon_data);
         obj->custom_icon_data = NULL;
     }
     furi_string_set(obj->custom_name, src->custom_name);

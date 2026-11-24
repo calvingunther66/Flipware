@@ -64,8 +64,10 @@ static void BrowserItem_t_set(BrowserItem_t* obj, const BrowserItem_t* src) {
     furi_string_set(obj->name, src->name);
     furi_string_set(obj->display_name, src->display_name);
     if(src->custom_icon_data) {
+        if(!obj->custom_icon_data) obj->custom_icon_data = malloc(CUSTOM_ICON_MAX_SIZE);
         memcpy(obj->custom_icon_data, src->custom_icon_data, CUSTOM_ICON_MAX_SIZE);
     } else {
+        free(obj->custom_icon_data);
         obj->custom_icon_data = NULL;
     }
 }
@@ -468,14 +470,14 @@ static void
                 (browser->hide_ext) && (item.type == BrowserItemTypeFile));
         }
 
-        // We shouldn't update screen on each item if custom callback is not set
-        // Otherwise it will cause screen flickering
-        bool instant_update = (browser->item_callback != NULL);
+        // No redraw per item: rows read "---" until the list is complete, and
+        // redrawing for every item competes with the SD card for the shared
+        // SPI bus. The last-item branch below redraws once loading is done.
         with_view_model(
             browser->view,
             FileBrowserModel * model,
             { items_array_push_back(model->items, item); },
-            instant_update);
+            false);
 
         furi_string_free(item.display_name);
         furi_string_free(item.name);
