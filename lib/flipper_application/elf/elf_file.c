@@ -82,7 +82,8 @@ static ELFSection* elf_file_get_or_put_section(ELFFile* elf, const char* name) {
                 .size = 0,
                 .rel_count = 0,
                 .rel_offset = 0,
-                .fast_rel = NULL,
+                .fast_rel_offset = 0,
+                .fast_rel_size = 0,
             });
         section_p = elf_file_get_section(elf, name);
     }
@@ -229,8 +230,31 @@ __attribute__((unused)) static const char* elf_reloc_type_to_str(int symt) {
 #undef STRCASE
 }
 
-static JMPTrampoline* elf_create_trampoline(Elf32_Addr addr) {
-    JMPTrampoline* trampoline = malloc(sizeof(JMPTrampoline));
+/* Trampolines live for as long as the app runs, and a big app needs one per
+ * imported firmware function (300+ for NFC or Sub-GHz). One malloc each costs
+ * a 24-byte heap block for 10 bytes of code and scatters hundreds of tiny
+ * blocks across the heap; pack them into slabs instead. The ldr literal in
+ * the trampoline needs each one 4-byte aligned, hence the 12-byte stride. */
+#define TRAMPOLINE_STRIDE        12
+#define TRAMPOLINES_PER_SLAB     32
+
+typedef struct ELFTrampolineSlab {
+    struct ELFTrampolineSlab* next;
+    uint32_t used;
+    uint8_t data[TRAMPOLINES_PER_SLAB * TRAMPOLINE_STRIDE] __attribute__((aligned(4)));
+} ELFTrampolineSlab;
+
+static JMPTrampoline* elf_create_trampoline(ELFFile* elf, Elf32_Addr addr) {
+    ELFTrampolineSlab* slab = elf->trampoline_slabs;
+    if(!slab || slab->used == TRAMPOLINES_PER_SLAB) {
+        slab = malloc(sizeof(ELFTrampolineSlab));
+        slab->next = elf->trampoline_slabs;
+        slab->used = 0;
+        elf->trampoline_slabs = slab;
+    }
+
+    JMPTrampoline* trampoline = (JMPTrampoline*)&slab->data[slab->used * TRAMPOLINE_STRIDE];
+    slab->used++;
     memcpy(trampoline->code, trampoline_code_little_endian, TRAMPOLINE_CODE_SIZE);
     trampoline->addr = addr;
     return trampoline;
@@ -281,7 +305,7 @@ static void elf_relocate_jmp_call(ELFFile* elf, Elf32_Addr relAddr, int type, El
 
             Elf32_Addr addr;
             if(!address_cache_get(elf->trampoline_cache, symAddr, &addr)) {
-                addr = (Elf32_Addr)elf_create_trampoline(symAddr);
+                addr = (Elf32_Addr)elf_create_trampoline(elf, symAddr);
                 address_cache_put(elf->trampoline_cache, symAddr, addr);
             }
 
@@ -621,17 +645,13 @@ static SectionTypeInfo elf_preload_section(
     if(str_prefix(name, ".fast.rel")) {
         name = name + strlen(".fast.rel");
         ELFSection* section_p = elf_file_get_or_put_section(elf, name);
-        section_p->fast_rel = malloc(sizeof(ELFSection));
+        // Records are streamed from the file while relocating: loading them
+        // whole added up to ~17 KB to the peak while the app is mapped.
+        section_p->fast_rel_offset = section_header->sh_offset;
+        section_p->fast_rel_size = section_header->sh_size;
 
         info.type = SectionTypeFastRelData;
-        info.result = elf_load_section_data(elf, section_p->fast_rel, section_header);
-
-        if(info.result != ELFLoadSectionResultSuccess) {
-            FURI_LOG_E(TAG, "Error loading section '%s'", name);
-        } else {
-            FURI_LOG_D(TAG, "Loaded fast rel section for '%s'", name);
-        }
-
+        info.result = ELFLoadSectionResultSuccess;
         return info;
     }
 
@@ -703,94 +723,143 @@ static bool elf_file_find_string_by_hash(ELFFile* elf, uint32_t hash, FuriString
     return result;
 }
 
+#define FAST_REL_BUFFER_SIZE 512
+
+typedef struct {
+    ELFFile* elf;
+    uint8_t* buffer;
+    size_t buffer_pos;
+    size_t buffer_len;
+    Elf32_Off file_pos;
+    Elf32_Word file_left;
+    bool error;
+} FastRelReader;
+
+static bool fast_rel_read(FastRelReader* r, void* out, size_t size) {
+    uint8_t* dst = out;
+    while(size) {
+        if(r->buffer_pos == r->buffer_len) {
+            size_t chunk = MIN((size_t)r->file_left, (size_t)FAST_REL_BUFFER_SIZE);
+            if(chunk == 0 || !storage_file_seek(r->elf->fd, r->file_pos, true) ||
+               storage_file_read(r->elf->fd, r->buffer, chunk) != chunk) {
+                r->error = true;
+                return false;
+            }
+            r->file_pos += chunk;
+            r->file_left -= chunk;
+            r->buffer_pos = 0;
+            r->buffer_len = chunk;
+        }
+        size_t n = MIN(size, r->buffer_len - r->buffer_pos);
+        memcpy(dst, &r->buffer[r->buffer_pos], n);
+        r->buffer_pos += n;
+        dst += n;
+        size -= n;
+    }
+    return true;
+}
+
 static bool elf_relocate_fast(ELFFile* elf, ELFSection* s) {
-    UNUSED(elf);
-    const uint8_t* start = s->fast_rel->data;
-    const uint8_t version = *start;
+    FastRelReader reader = {
+        .elf = elf,
+        .buffer = malloc(FAST_REL_BUFFER_SIZE),
+        .buffer_pos = 0,
+        .buffer_len = 0,
+        .file_pos = s->fast_rel_offset,
+        .file_left = s->fast_rel_size,
+        .error = false,
+    };
+    FastRelReader* r = &reader;
     bool no_errors = true;
 
-    if(version != FAST_RELOCATION_VERSION) {
-        FURI_LOG_E(TAG, "Unsupported fast relocation version %d", version);
-        return false;
-    }
-    start += 1;
-
-    const uint32_t records_count = *((uint32_t*)start);
-    start += 4;
-    FURI_LOG_D(TAG, "Fast relocation records count: %ld", records_count);
-
-    for(uint32_t i = 0; i < records_count; i++) {
-        bool is_section = (*start & (0x1 << 7)) ? true : false;
-        uint8_t type = *start & 0x7F;
-        start += 1;
-        uint32_t hash_or_section_index = *((uint32_t*)start);
-        start += 4;
-
-        uint32_t section_value = ELF_INVALID_ADDRESS;
-        if(is_section) {
-            section_value = *((uint32_t*)start);
-            start += 4;
-        }
-
-        const uint32_t offsets_count = *((uint32_t*)start);
-        start += 4;
-
-        FURI_LOG_D(
-            TAG,
-            "Fast relocation record %ld: is_section=%d, type=%d, hash_or_section_index=%lX, offsets_count=%ld",
-            i,
-            is_section,
-            type,
-            hash_or_section_index,
-            offsets_count);
-
-        Elf32_Addr address = 0;
-        if(is_section) {
-            ELFSection* symSec = elf_section_of(elf, hash_or_section_index);
-            if(symSec) {
-                address = ((Elf32_Addr)symSec->data) + section_value;
-            }
-        } else {
-            address = elf_address_of_by_hash(elf, hash_or_section_index);
-        }
-
-        if(address == ELF_INVALID_ADDRESS) {
-            FuriString* symbol_name = furi_string_alloc();
-            if(elf_file_find_string_by_hash(elf, hash_or_section_index, symbol_name)) {
-                FURI_LOG_E(
-                    TAG,
-                    "Failed to resolve address for symbol %s (hash %lX)",
-                    furi_string_get_cstr(symbol_name),
-                    hash_or_section_index);
-            } else {
-                FURI_LOG_E(
-                    TAG,
-                    "Failed to resolve address for hash %lX (string not found)",
-                    hash_or_section_index);
-            }
-            furi_string_free(symbol_name);
-
+    do {
+        uint8_t version = 0;
+        if(!fast_rel_read(r, &version, 1)) break;
+        if(version != FAST_RELOCATION_VERSION) {
+            FURI_LOG_E(TAG, "Unsupported fast relocation version %d", version);
             no_errors = false;
-            start += 3 * offsets_count;
-        } else {
-            for(uint32_t j = 0; j < offsets_count; j++) {
-                uint32_t offset = *((uint32_t*)start) & 0x00FFFFFF;
-                start += 3;
-                Elf32_Addr relAddr = ((Elf32_Addr)s->data) + offset;
-                elf_relocate_symbol(elf, relAddr, type, address);
-            }
+            break;
         }
+
+        uint32_t records_count = 0;
+        if(!fast_rel_read(r, &records_count, 4)) break;
+        FURI_LOG_D(TAG, "Fast relocation records count: %ld", records_count);
+
+        for(uint32_t i = 0; i < records_count; i++) {
+            uint8_t flags_type = 0;
+            uint32_t hash_or_section_index = 0;
+            uint32_t section_value = ELF_INVALID_ADDRESS;
+            uint32_t offsets_count = 0;
+
+            if(!fast_rel_read(r, &flags_type, 1)) break;
+            bool is_section = (flags_type & (0x1 << 7)) ? true : false;
+            uint8_t type = flags_type & 0x7F;
+            if(!fast_rel_read(r, &hash_or_section_index, 4)) break;
+            if(is_section && !fast_rel_read(r, &section_value, 4)) break;
+            if(!fast_rel_read(r, &offsets_count, 4)) break;
+
+            FURI_LOG_D(
+                TAG,
+                "Fast relocation record %ld: is_section=%d, type=%d, hash_or_section_index=%lX, offsets_count=%ld",
+                i,
+                is_section,
+                type,
+                hash_or_section_index,
+                offsets_count);
+
+            Elf32_Addr address = 0;
+            if(is_section) {
+                ELFSection* symSec = elf_section_of(elf, hash_or_section_index);
+                if(symSec) {
+                    address = ((Elf32_Addr)symSec->data) + section_value;
+                }
+            } else {
+                address = elf_address_of_by_hash(elf, hash_or_section_index);
+            }
+
+            if(address == ELF_INVALID_ADDRESS) {
+                FuriString* symbol_name = furi_string_alloc();
+                if(elf_file_find_string_by_hash(elf, hash_or_section_index, symbol_name)) {
+                    FURI_LOG_E(
+                        TAG,
+                        "Failed to resolve address for symbol %s (hash %lX)",
+                        furi_string_get_cstr(symbol_name),
+                        hash_or_section_index);
+                } else {
+                    FURI_LOG_E(
+                        TAG,
+                        "Failed to resolve address for hash %lX (string not found)",
+                        hash_or_section_index);
+                }
+                furi_string_free(symbol_name);
+                no_errors = false;
+            }
+
+            for(uint32_t j = 0; j < offsets_count; j++) {
+                uint32_t offset = 0;
+                if(!fast_rel_read(r, &offset, 3)) break;
+                if(address != ELF_INVALID_ADDRESS) {
+                    Elf32_Addr relAddr = ((Elf32_Addr)s->data) + (offset & 0x00FFFFFF);
+                    elf_relocate_symbol(elf, relAddr, type, address);
+                }
+            }
+            if(r->error) break;
+        }
+    } while(false);
+
+    if(r->error) {
+        FURI_LOG_E(TAG, "Failed to read fast relocation records");
+        no_errors = false;
     }
 
-    aligned_free(s->fast_rel->data);
-    free(s->fast_rel);
-    s->fast_rel = NULL;
+    free(reader.buffer);
+    s->fast_rel_size = 0;
 
     return no_errors;
 }
 
 static bool elf_relocate_section(ELFFile* elf, ELFSection* section) {
-    if(section->fast_rel) {
+    if(section->fast_rel_size) {
         FURI_LOG_D(TAG, "Fast relocating section");
         return elf_relocate_fast(elf, section);
     } else if(section->rel_count) {
@@ -831,6 +900,8 @@ ELFFile* elf_file_alloc(Storage* storage, const ElfApiInterface* api_interface) 
     elf->api_interface = api_interface;
     ELFSectionDict_init(elf->sections);
     AddressCache_init(elf->trampoline_cache);
+    elf->trampoline_cache_freed = false;
+    elf->trampoline_slabs = NULL;
     elf->init_array_called = false;
     return elf;
 }
@@ -849,10 +920,6 @@ void elf_file_free(ELFFile* elf) {
             ELFSectionDict_next(it)) {
             const ELFSectionDict_itref_t* itref = ELFSectionDict_cref(it);
             aligned_free(itref->value.data);
-            if(itref->value.fast_rel) {
-                aligned_free(itref->value.fast_rel->data);
-                free(itref->value.fast_rel);
-            }
             free((void*)itref->key);
         }
 
@@ -860,15 +927,13 @@ void elf_file_free(ELFFile* elf) {
     }
 
     // free trampoline data
-    {
-        AddressCache_it_t it;
-        for(AddressCache_it(it, elf->trampoline_cache); !AddressCache_end_p(it);
-            AddressCache_next(it)) {
-            const AddressCache_itref_t* itref = AddressCache_cref(it);
-            free((void*)itref->value);
-        }
-
+    if(!elf->trampoline_cache_freed) {
         AddressCache_clear(elf->trampoline_cache);
+    }
+    while(elf->trampoline_slabs) {
+        ELFTrampolineSlab* next = elf->trampoline_slabs->next;
+        free(elf->trampoline_slabs);
+        elf->trampoline_slabs = next;
     }
 
     if(elf->debug_link_info.debug_link) {
@@ -1073,6 +1138,11 @@ ELFFileLoadStatus elf_file_load_sections(ELFFile* elf) {
     FURI_LOG_D(TAG, "Relocation cache size: %u", AddressCache_size(elf->relocation_cache));
     FURI_LOG_D(TAG, "Trampoline cache size: %u", AddressCache_size(elf->trampoline_cache));
     AddressCache_clear(elf->relocation_cache);
+
+    // The trampoline lookup is only needed to share trampolines while
+    // relocating; the trampolines themselves stay in their slabs.
+    AddressCache_clear(elf->trampoline_cache);
+    elf->trampoline_cache_freed = true;
 
     {
         size_t total_size = 0;
