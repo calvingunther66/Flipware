@@ -118,8 +118,26 @@ static bool elf_read_string_from_offset(ELFFile* elf, off_t offset, FuriString* 
     return result;
 }
 
+static bool elf_read_string_at(ELFFile* elf, off_t offset, FuriString* name) {
+    // Like elf_read_string_from_offset, but leaves the file position where it
+    // ends up: the section-table walkers seek explicitly before every read, so
+    // the tell + seek-back round trips to the storage thread are wasted.
+    if(!storage_file_seek(elf->fd, offset, true)) return false;
+
+    char buffer[ELF_NAME_BUFFER_LEN + 1];
+    buffer[ELF_NAME_BUFFER_LEN] = 0;
+
+    while(true) {
+        size_t read = storage_file_read(elf->fd, buffer, ELF_NAME_BUFFER_LEN);
+        buffer[read] = 0;
+        furi_string_cat(name, buffer);
+        if(strlen(buffer) < ELF_NAME_BUFFER_LEN) return true;
+        if(storage_file_get_error(elf->fd) != FSE_OK || read == 0) return false;
+    }
+}
+
 static bool elf_read_section_name(ELFFile* elf, off_t offset, FuriString* name) {
-    return elf_read_string_from_offset(elf, elf->section_table_strings + offset, name);
+    return elf_read_string_at(elf, elf->section_table_strings + offset, name);
 }
 
 static bool elf_read_symbol_name(ELFFile* elf, off_t offset, FuriString* name) {
@@ -877,6 +895,7 @@ bool elf_file_open(ELFFile* elf, const char* path) {
     elf->sections_count = h.e_shnum;
     elf->section_table = h.e_shoff;
     elf->section_table_strings = sH.sh_offset;
+    elf->section_table_strings_size = sH.sh_size;
     return true;
 }
 
@@ -933,37 +952,92 @@ ElfLoadSectionTableResult elf_file_load_section_table(ELFFile* elf) {
     }
 }
 
+#define ELF_SECTION_BATCH      8
+#define ELF_SHSTRTAB_CACHE_MAX 1024
+
+static bool elf_find_section_fast(ELFFile* elf, const char* name, Elf32_Shdr* found) {
+    // Used for the manifest lookup done for every .fap in a folder listing.
+    // Reading one 40-byte header and one name per section costs about six
+    // storage round trips per section; instead read the headers in batches
+    // and the section-name table in one go. Everything here is temporary.
+    Elf32_Shdr* headers = malloc(sizeof(Elf32_Shdr) * ELF_SECTION_BATCH);
+    char* names = NULL;
+    size_t names_size = 0;
+    bool result = false;
+
+    do {
+        const size_t strtab_size = elf->section_table_strings_size;
+        if(strtab_size > 0 && strtab_size <= ELF_SHSTRTAB_CACHE_MAX) {
+            names = malloc(strtab_size + 1);
+            if(storage_file_seek(elf->fd, elf->section_table_strings, true) &&
+               storage_file_read(elf->fd, names, strtab_size) == strtab_size) {
+                names[strtab_size] = 0;
+                names_size = strtab_size;
+            } else {
+                free(names);
+                names = NULL;
+            }
+        }
+
+        FuriString* section_name = names ? NULL : furi_string_alloc();
+        bool io_error = false;
+
+        for(size_t batch_start = 1; batch_start < elf->sections_count && !result && !io_error;
+            batch_start += ELF_SECTION_BATCH) {
+            size_t count = elf->sections_count - batch_start;
+            if(count > ELF_SECTION_BATCH) count = ELF_SECTION_BATCH;
+            size_t bytes = count * sizeof(Elf32_Shdr);
+            if(!storage_file_seek(elf->fd, SECTION_OFFSET(elf, batch_start), true) ||
+               storage_file_read(elf->fd, headers, bytes) != bytes) {
+                io_error = true;
+                break;
+            }
+
+            for(size_t i = 0; i < count; i++) {
+                bool match;
+                if(names) {
+                    match = headers[i].sh_name < names_size &&
+                            strcmp(names + headers[i].sh_name, name) == 0;
+                } else {
+                    furi_string_reset(section_name);
+                    if(headers[i].sh_name &&
+                       !elf_read_section_name(elf, headers[i].sh_name, section_name)) {
+                        io_error = true;
+                        break;
+                    }
+                    match = furi_string_cmp_str(section_name, name) == 0;
+                }
+                if(match) {
+                    *found = headers[i];
+                    result = true;
+                    break;
+                }
+            }
+        }
+
+        if(section_name) furi_string_free(section_name);
+    } while(false);
+
+    free(names);
+    free(headers);
+    return result;
+}
+
 ElfProcessSectionResult elf_process_section(
     ELFFile* elf,
     const char* name,
     ElfProcessSection* process_section,
     void* context) {
     ElfProcessSectionResult result = ElfProcessSectionResultNotFound;
-    FuriString* section_name = furi_string_alloc();
-    Elf32_Shdr section_header;
+    Elf32_Shdr section_header = {0};
 
-    // find section
-    for(size_t section_idx = 1; section_idx < elf->sections_count; section_idx++) {
-        furi_string_reset(section_name);
-        if(!elf_read_section(elf, section_idx, &section_header, section_name)) {
-            break;
-        }
-
-        if(furi_string_cmp(section_name, name) == 0) {
-            result = ElfProcessSectionResultCannotProcess;
-            break;
-        }
-    }
-
-    if(result != ElfProcessSectionResultNotFound) { //-V547
+    if(elf_find_section_fast(elf, name, &section_header)) {
         if(process_section(elf->fd, section_header.sh_offset, section_header.sh_size, context)) {
             result = ElfProcessSectionResultSuccess;
         } else {
-            result = ElfProcessSectionResultCannotProcess; //-V1048
+            result = ElfProcessSectionResultCannotProcess;
         }
     }
-
-    furi_string_free(section_name);
 
     return result;
 }

@@ -32,6 +32,7 @@ struct ELFFile {
     size_t sections_count;
     off_t section_table;
     off_t section_table_strings;
+    size_t section_table_strings_size;
 
     size_t symbol_count;
     off_t symbol_table;
