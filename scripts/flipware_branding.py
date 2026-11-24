@@ -7,6 +7,7 @@ Writes:
   assets/icons/ControlCenter/CC_Momentum_16x16.png lock-menu tile icon
   assets/slideshow/firstboot/frame_0{0,1,4,5,6}.png intro slides
   assets/slideshow/update_default/frame_00.png     "updated" splash after an update
+  assets/icons/Update/Updating_Logo_62x15.png      boot and update-install logo
 
 The icon file and symbol names stay the same on purpose: they are part of
 the app API (A_Momentum_14, I_CC_Momentum_16x16), so renaming them would
@@ -237,6 +238,7 @@ def make_cc_icon():
 
 # Boot/updater logo: 9-row capitals with 2px stems, in the style of the
 # Momentum logo it replaces (top 5 rows upright, bottom 4 stepped right by 1).
+# fmt: off
 BOOT = {
     "F": ["######", "######", "##....", "####..", "####..", "##....", "##....", "##....", "##...."],
     "L": ["##....", "##....", "##....", "##....", "##....", "##....", "##....", "######", "######"],
@@ -247,16 +249,25 @@ BOOT = {
     "R": ["#####.", "######", "##..##", "##..##", "#####.", "####..", "##.##.", "##..##", "##..##"],
     "E": ["######", "######", "##....", "####..", "####..", "##....", "##....", "######", "######"],
 }
+# fmt: on
+
+
+# The old logo's small "FIRMWARE" text (33x5), kept as is.
+FIRMWARE_SMALL = [
+    "###.#.##...#.#..#.#.#..#..##..###",
+    "#...#.#.#.#.#.#.#.#.#.#.#.#.#.#..",
+    "##..#.##..#.#.#.#.#.#.###.##..###",
+    "#...#.#.#.#.#.#.#.#.#.#.#.#.#.#..",
+    "#...#.#.#.#.#.#..#.#..#.#.#.#.###",
+]
 
 
 def make_boot_logo():
     # Updating_Logo_62x15: drawn on the boot screen (furi/flipper.c) and the
-    # updater's install screen. Wordmark on top; the small "FIRMWARE" text is
-    # kept from the old logo, centred between two rules like the update splash.
+    # updater's install screen. Wordmark on top, small "FIRMWARE" centred
+    # between two rules like the update splash. Drawn from scratch, so it is
+    # safe to re-run.
     path = ROOT / "assets/icons/Update/Updating_Logo_62x15.png"
-    old = Image.open(path).convert("1")
-    assert old.size == (62, 15)
-    firmware = old.crop((29, 10, 62, 15))  # the old logo's "FIRMWARE" text
     img = Image.new("1", (62, 15), WHITE)
     text = "FLIPWARE"
     w = sum(len(BOOT[c][0]) for c in text) + len(text) - 1 + 1  # +1 for the step
@@ -266,10 +277,11 @@ def make_boot_logo():
         blit(img, rows[:5], x, 0)
         blit(img, rows[5:], x + 1, 5)
         x += len(rows[0]) + 1
-    fx = (62 - firmware.width) // 2
-    img.paste(firmware, (fx, 10))
+    fw = len(FIRMWARE_SMALL[0])
+    fx = (62 - fw) // 2
+    blit(img, FIRMWARE_SMALL, fx, 10)
     fill(img, (0, 12, fx - 2, 13), BLACK)
-    fill(img, (fx + firmware.width + 2, 12, 62, 13), BLACK)
+    fill(img, (fx + fw + 2, 12, 62, 13), BLACK)
     img.save(path)
 
 
