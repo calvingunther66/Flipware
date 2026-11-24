@@ -29,7 +29,13 @@ typedef struct {
     FuriPubSub* event_pubsub;
     volatile uint8_t press_counter;
     volatile uint32_t counter;
+    volatile uint32_t press_tick;
 } InputPinState;
+
+/* Serializes the press timer callback (timer thread) with key release (input
+ * thread). Release used to busy-wait until the timer thread had processed the
+ * stop, so a busy or blocked timer thread froze key handling. */
+static FuriMutex* input_press_mutex = NULL;
 
 // #define INPUT_DEBUG
 
@@ -37,6 +43,15 @@ typedef struct {
 
 void input_press_timer_callback(void* arg) {
     InputPinState* input_pin = arg;
+
+    furi_check(furi_mutex_acquire(input_press_mutex, FuriWaitForever) == FuriStatusOk);
+    // Drop ticks that arrive after the key was released, and a stale tick of a
+    // previous press landing right after a new press started.
+    if(!input_pin->state || (furi_get_tick() - input_pin->press_tick) < INPUT_PRESS_TICKS / 2) {
+        furi_mutex_release(input_press_mutex);
+        return;
+    }
+
     InputEvent event;
     event.sequence_source = INPUT_SEQUENCE_SOURCE_HARDWARE;
     event.sequence_counter = input_pin->counter;
@@ -50,6 +65,8 @@ void input_press_timer_callback(void* arg) {
         event.type = InputTypeRepeat;
         furi_pubsub_publish(input_pin->event_pubsub, &event);
     }
+
+    furi_mutex_release(input_press_mutex);
 }
 
 void input_isr(void* _ctx) {
@@ -90,6 +107,7 @@ int32_t input_srv(void* p) {
     FuriPubSub* event_pubsub = furi_pubsub_alloc();
     FuriPubSub* ascii_pubsub = furi_pubsub_alloc();
     uint32_t counter = 1;
+    input_press_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     furi_record_create(RECORD_INPUT_EVENTS, event_pubsub);
     furi_record_create(RECORD_ASCII_EVENTS, ascii_pubsub);
 
@@ -113,6 +131,8 @@ int32_t input_srv(void* p) {
             furi_timer_alloc(input_press_timer_callback, FuriTimerTypePeriodic, &pin_states[i]);
         pin_states[i].event_pubsub = event_pubsub;
         pin_states[i].press_counter = 0;
+        pin_states[i].counter = 0;
+        pin_states[i].press_tick = 0;
     }
 
     while(1) {
@@ -137,19 +157,28 @@ int32_t input_srv(void* p) {
 
                 // Short / Long / Repeat timer routine
                 if(state) {
+                    furi_check(
+                        furi_mutex_acquire(input_press_mutex, FuriWaitForever) == FuriStatusOk);
                     pin_states[i].counter = counter++;
+                    pin_states[i].press_counter = 0;
+                    pin_states[i].press_tick = furi_get_tick();
+                    furi_mutex_release(input_press_mutex);
                     event.sequence_counter = pin_states[i].counter;
                     furi_timer_start(pin_states[i].press_timer, INPUT_PRESS_TICKS);
                 } else {
+                    // state is already false, so a tick that fires from here
+                    // on is ignored by the callback; no need to wait for the
+                    // timer thread to process the stop.
+                    furi_check(
+                        furi_mutex_acquire(input_press_mutex, FuriWaitForever) == FuriStatusOk);
                     event.sequence_counter = pin_states[i].counter;
                     furi_timer_stop(pin_states[i].press_timer);
-                    while(furi_timer_is_running(pin_states[i].press_timer))
-                        furi_delay_tick(1);
                     if(pin_states[i].press_counter < INPUT_LONG_PRESS_COUNTS) {
                         event.type = InputTypeShort;
                         furi_pubsub_publish(event_pubsub, &event);
                     }
                     pin_states[i].press_counter = 0;
+                    furi_mutex_release(input_press_mutex);
                 }
 
                 // Send Press/Release event
