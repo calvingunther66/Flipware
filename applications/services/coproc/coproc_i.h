@@ -8,7 +8,6 @@
 
 struct Coproc {
     FuriThread* thread;
-    FuriMessageQueue* queue; // unused beyond keeping the service thread idle-blocked
 
     Expansion* expansion;
 
