@@ -7,6 +7,7 @@ Writes:
   assets/icons/ControlCenter/CC_Momentum_16x16.png lock-menu tile icon
   assets/slideshow/firstboot/frame_0{0,1,4,5,6}.png intro slides
   assets/slideshow/update_default/frame_00.png     "updated" splash after an update
+  assets/icons/Update/Updating_Logo_62x15.png      boot and update-install logo
 
 The icon file and symbol names stay the same on purpose: they are part of
 the app API (A_Momentum_14, I_CC_Momentum_16x16), so renaming them would
@@ -302,6 +303,55 @@ def make_cc_icon():
     img.save(CC_ICON)
 
 
+# Boot/updater logo: 9-row capitals with 2px stems, in the style of the
+# Momentum logo it replaces (top 5 rows upright, bottom 4 stepped right by 1).
+# fmt: off
+BOOT = {
+    "F": ["######", "######", "##....", "####..", "####..", "##....", "##....", "##....", "##...."],
+    "L": ["##....", "##....", "##....", "##....", "##....", "##....", "##....", "######", "######"],
+    "I": ["######", "######", "..##..", "..##..", "..##..", "..##..", "..##..", "######", "######"],
+    "P": ["#####.", "######", "##..##", "##..##", "######", "#####.", "##....", "##....", "##...."],
+    "W": ["##.##.##"] * 7 + ["########", ".######."],
+    "A": [".####.", "######", "##..##", "##..##", "######", "######", "##..##", "##..##", "##..##"],
+    "R": ["#####.", "######", "##..##", "##..##", "#####.", "####..", "##.##.", "##..##", "##..##"],
+    "E": ["######", "######", "##....", "####..", "####..", "##....", "##....", "######", "######"],
+}
+# fmt: on
+
+
+# The old logo's small "FIRMWARE" text (33x5), kept as is.
+FIRMWARE_SMALL = [
+    "###.#.##...#.#..#.#.#..#..##..###",
+    "#...#.#.#.#.#.#.#.#.#.#.#.#.#.#..",
+    "##..#.##..#.#.#.#.#.#.###.##..###",
+    "#...#.#.#.#.#.#.#.#.#.#.#.#.#.#..",
+    "#...#.#.#.#.#.#..#.#..#.#.#.#.###",
+]
+
+
+def make_boot_logo():
+    # Updating_Logo_62x15: drawn on the boot screen (furi/flipper.c) and the
+    # updater's install screen. Wordmark on top, small "FIRMWARE" centred
+    # between two rules like the update splash. Drawn from scratch, so it is
+    # safe to re-run.
+    path = ROOT / "assets/icons/Update/Updating_Logo_62x15.png"
+    img = Image.new("1", (62, 15), WHITE)
+    text = "FLIPWARE"
+    w = sum(len(BOOT[c][0]) for c in text) + len(text) - 1 + 1  # +1 for the step
+    x = (62 - w) // 2
+    for c in text:
+        rows = BOOT[c]
+        blit(img, rows[:5], x, 0)
+        blit(img, rows[5:], x + 1, 5)
+        x += len(rows[0]) + 1
+    fw = len(FIRMWARE_SMALL[0])
+    fx = (62 - fw) // 2
+    blit(img, FIRMWARE_SMALL, fx, 10)
+    fill(img, (0, 12, fx - 2, 13), BLACK)
+    fill(img, (fx + fw + 2, 12, 62, 13), BLACK)
+    img.save(path)
+
+
 def make_readme_logo():
     # Wordmark at 2x, then scaled 6x for the README (light and dark).
     w = big_width("FLIPWARE", 2)
@@ -323,8 +373,18 @@ def make_readme_logo():
 
 
 if __name__ == "__main__":
-    make_readme_logo()
-    make_slides()
-    make_update_splash()
-    make_menu_icon()
-    make_cc_icon()
+    import sys
+
+    # No arguments: run every generator. Otherwise name the ones to run,
+    # e.g. `flipware_branding.py boot_logo` (the slide and splash edits are
+    # one-shot, so re-run only what you need).
+    steps = {
+        "readme_logo": make_readme_logo,
+        "slides": make_slides,
+        "update_splash": make_update_splash,
+        "menu_icon": make_menu_icon,
+        "cc_icon": make_cc_icon,
+        "boot_logo": make_boot_logo,
+    }
+    for name in sys.argv[1:] or steps:
+        steps[name]()
