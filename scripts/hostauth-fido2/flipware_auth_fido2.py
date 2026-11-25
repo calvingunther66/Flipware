@@ -51,7 +51,12 @@ def b64url_decode(text: str) -> bytes:
 def client_data_json(challenge_b64: str) -> bytes:
     """Byte for byte what the Flipper rebuilds (and what CollectedClientData.create makes)."""
     return json.dumps(
-        {"type": "webauthn.get", "challenge": challenge_b64, "origin": ORIGIN, "crossOrigin": False},
+        {
+            "type": "webauthn.get",
+            "challenge": challenge_b64,
+            "origin": ORIGIN,
+            "crossOrigin": False,
+        },
         separators=(",", ":"),
     ).encode()
 
@@ -85,7 +90,9 @@ def sanitize_label(label: str) -> str:
 def cose_to_uncompressed(cose) -> bytes:
     # COSE_Key EC2: 1 (kty) = 2, 3 (alg) = -7 (ES256), -1 (crv) = 1 (P-256), -2 x, -3 y
     if cose.get(1) != 2 or cose.get(3) != -7 or cose.get(-1) != 1:
-        raise Fail("The authenticator did not make a P-256 (ES256) key; the Flipper only verifies P-256.")
+        raise Fail(
+            "The authenticator did not make a P-256 (ES256) key; the Flipper only verifies P-256."
+        )
     x, y = cose[-2], cose[-3]
     if len(x) != 32 or len(y) != 32:
         raise Fail("Unexpected key size from the authenticator.")
@@ -112,11 +119,17 @@ class Flipper:
         from serial.tools import list_ports
 
         if port is None:
-            found = [p.device for p in list_ports.comports() if p.vid == FLIPPER_VID and p.pid == FLIPPER_PID]
+            found = [
+                p.device
+                for p in list_ports.comports()
+                if p.vid == FLIPPER_VID and p.pid == FLIPPER_PID
+            ]
             if not found:
                 raise Fail("No Flipper found on USB.")
             if len(found) > 1:
-                raise Fail("Several Flippers found, pick one with --port: " + ", ".join(found))
+                raise Fail(
+                    "Several Flippers found, pick one with --port: " + ", ".join(found)
+                )
             port = found[0]
         self.ser = serial.Serial(port, 115200, timeout=0.05)
         self.ser.dtr = True  # the Flipper starts its shell on DTR
@@ -136,7 +149,9 @@ class Flipper:
                     while "[" in clean and "m" in clean[clean.find("[") :]:
                         start = clean.find("[")
                         end = clean.find("m", start)
-                        if end < 0 or not all(c in "0123456789;" for c in clean[start + 1 : end]):
+                        if end < 0 or not all(
+                            c in "0123456789;" for c in clean[start + 1 : end]
+                        ):
                             break
                         clean = clean[:start] + clean[end + 1 :]
                     clean = clean.strip()
@@ -165,7 +180,9 @@ class Flipper:
                 lines = block[echoes[-1] + 1 :]
                 break
         if any("cannot be run while an application is open" in l for l in lines):
-            raise Fail("An app is open on the Flipper. Go back to the desktop, then try again.")
+            raise Fail(
+                "An app is open on the Flipper. Go back to the desktop, then try again."
+            )
         replies = []
         for l in lines:
             if not l.startswith("hostauth-"):
@@ -188,9 +205,13 @@ class Flipper:
         replies = self.command("hostauth info")
         info = next((f for k, w, f in replies if k == "info"), None)
         if not info or "uid" not in info:
-            raise Fail("This Flipper doesn't answer `hostauth info`. Is it running Flipware with host sign-in?")
+            raise Fail(
+                "This Flipper doesn't answer `hostauth info`. Is it running Flipware with host sign-in?"
+            )
         if info.get("v") != PROTOCOL or info.get("rp") != RP_ID:
-            raise Fail(f"This Flipper speaks host sign-in v{info.get('v')}; this tool speaks v{PROTOCOL}.")
+            raise Fail(
+                f"This Flipper speaks host sign-in v{info.get('v')}; this tool speaks v{PROTOCOL}."
+            )
         info["fps"] = [f.get("fp") for k, w, f in replies if k == "key"]
         return info
 
@@ -254,7 +275,9 @@ def make_client():
         # Our own client data: never derived from anything but the challenge bytes
         def collect_client_data(self, options):
             if isinstance(options, PublicKeyCredentialCreationOptions):
-                cd = CollectedClientData.create(type="webauthn.create", challenge=options.challenge, origin=ORIGIN)
+                cd = CollectedClientData.create(
+                    type="webauthn.create", challenge=options.challenge, origin=ORIGIN
+                )
             else:
                 cd = CollectedClientData(client_data_json(b64url(options.challenge)))
             return cd, RP_ID
@@ -280,7 +303,10 @@ def make_client():
     dev = next(CtapHidDevice.list_devices(), None)
     if dev is None:
         raise Fail("No FIDO2 security key found (and no Windows WebAuthn API).")
-    return Fido2Client(dev, client_data_collector=Collector(), user_interaction=Prompt()), "ctap-hid"
+    return (
+        Fido2Client(dev, client_data_collector=Collector(), user_interaction=Prompt()),
+        "ctap-hid",
+    )
 
 
 # ========
@@ -305,14 +331,24 @@ def cmd_enroll(args):
     if info.get("locked") == "1":
         raise Fail("Unlock the Flipper with its PIN first, then enroll.")
     if store_path(info["uid"]).exists():
-        raise Fail(f"This computer already has a key for Flipper {info['uid']}. Run `forget` first.")
+        raise Fail(
+            f"This computer already has a key for Flipper {info['uid']}. Run `forget` first."
+        )
 
     client, kind = make_client()
     options = PublicKeyCredentialCreationOptions(
         rp=PublicKeyCredentialRpEntity(id=RP_ID, name="Flipware host sign-in"),
-        user=PublicKeyCredentialUserEntity(id=bytes.fromhex(info["uid"]), name=f"flipper-{info['uid']}"),
-        challenge=os.urandom(32),  # no attestation is checked: the Flipper's on-device prompt is the trust step
-        pub_key_cred_params=[PublicKeyCredentialParameters(type=PublicKeyCredentialType.PUBLIC_KEY, alg=-7)],
+        user=PublicKeyCredentialUserEntity(
+            id=bytes.fromhex(info["uid"]), name=f"flipper-{info['uid']}"
+        ),
+        challenge=os.urandom(
+            32
+        ),  # no attestation is checked: the Flipper's on-device prompt is the trust step
+        pub_key_cred_params=[
+            PublicKeyCredentialParameters(
+                type=PublicKeyCredentialType.PUBLIC_KEY, alg=-7
+            )
+        ],
         authenticator_selection=AuthenticatorSelectionCriteria(
             resident_key=ResidentKeyRequirement.DISCOURAGED,
             user_verification=UserVerificationRequirement.PREFERRED,
@@ -332,7 +368,9 @@ def cmd_enroll(args):
 
     label = sanitize_label(args.label or platform.node() or "computer")
     print(f"Fingerprint: {grouped(fp)}")
-    print("Check that the Flipper shows the same fingerprint, then hold OK on it (Back cancels).")
+    print(
+        "Check that the Flipper shows the same fingerprint, then hold OK on it (Back cancels)."
+    )
     replies = flipper.command(f"hostauth enroll {pub.hex()} {uv} {label}", timeout=75)
     ok = next((f for k, w, f in replies if k == "ok"), None)
     if not ok or ok.get("fp") != fp:
@@ -349,15 +387,21 @@ def cmd_enroll(args):
             "client": kind,
         },
     )
-    print(f"Enrolled with Flipper {info['uid']} ({'user verification' if uv else 'touch only'} on every unlock).")
+    print(
+        f"Enrolled with Flipper {info['uid']} ({'user verification' if uv else 'touch only'} on every unlock)."
+    )
 
 
-def assertion_to_response(auth_data_bytes: bytes, signature: bytes, client_data: bytes, challenge_b64: str):
+def assertion_to_response(
+    auth_data_bytes: bytes, signature: bytes, client_data: bytes, challenge_b64: str
+):
     """Check what the authenticator returned and format the Flipper's `response` line."""
     if bytes(client_data) != client_data_json(challenge_b64):
         raise Fail("The client data changed on the way; not sending it.")
     if len(auth_data_bytes) != 37:
-        raise Fail("The authenticator returned extensions; the Flipper only takes plain 37-byte authenticator data.")
+        raise Fail(
+            "The authenticator returned extensions; the Flipper only takes plain 37-byte authenticator data."
+        )
     if not (auth_data_bytes[32] & FLAG_UP):
         raise Fail("The authenticator did not confirm user presence.")
     return f"hostauth response {auth_data_bytes.hex()} {signature.hex()}"
@@ -404,12 +448,15 @@ def cmd_unlock(args):
         rp_id=RP_ID,
         allow_credentials=[
             PublicKeyCredentialDescriptor(
-                type=PublicKeyCredentialType.PUBLIC_KEY, id=b64url_decode(record["credential_id"])
+                type=PublicKeyCredentialType.PUBLIC_KEY,
+                id=b64url_decode(record["credential_id"]),
             )
         ],
-        user_verification=UserVerificationRequirement.REQUIRED
-        if record.get("uv")
-        else UserVerificationRequirement.DISCOURAGED,
+        user_verification=(
+            UserVerificationRequirement.REQUIRED
+            if record.get("uv")
+            else UserVerificationRequirement.DISCOURAGED
+        ),
         timeout=25000,  # inside the Flipper's 30 s challenge lifetime
     )
     print("Approve the sign-in on this computer...")
@@ -444,8 +491,14 @@ def cmd_status(args):
     )
     if store_path(info["uid"]).exists():
         rec = store_load(info["uid"])
-        enrolled = "unknown while locked" if info.get("locked") == "1" else ("yes" if rec["fingerprint"] in info["fps"] else "no")
-        print(f"This computer: {grouped(rec['fingerprint'])} via {rec.get('client')}, enrolled on the Flipper: {enrolled}")
+        enrolled = (
+            "unknown while locked"
+            if info.get("locked") == "1"
+            else ("yes" if rec["fingerprint"] in info["fps"] else "no")
+        )
+        print(
+            f"This computer: {grouped(rec['fingerprint'])} via {rec.get('client')}, enrolled on the Flipper: {enrolled}"
+        )
     else:
         print("This computer has no key for it.")
 
@@ -469,9 +522,15 @@ def cmd_forget(args):
     rec = store_load(info["uid"])
     replies = flipper.command(f"hostauth revoke {rec['fingerprint']}")
     if not any(k == "ok" for k, w, f in replies):
-        raise Fail("The Flipper did not revoke the key (" + error_text(replies) + "); the local record was kept.")
+        raise Fail(
+            "The Flipper did not revoke the key ("
+            + error_text(replies)
+            + "); the local record was kept."
+        )
     store_path(info["uid"]).unlink()
-    print(f"Revoked on the Flipper and deleted the local record for Flipper {info['uid']}.")
+    print(
+        f"Revoked on the Flipper and deleted the local record for Flipper {info['uid']}."
+    )
 
 
 def cmd_revoke_all(args):
@@ -501,9 +560,17 @@ def cmd_selftest(args):
         ch = b64url(raw)
         b = parse_binding(b64url_decode(ch))
         assert b and b["uid"] == uid.hex() and b["epoch"] == 7 and b["counter"] == 9
-        assert bytes(CollectedClientData.create(type="webauthn.get", challenge=raw, origin=ORIGIN)) == client_data_json(ch)
+        assert bytes(
+            CollectedClientData.create(
+                type="webauthn.get", challenge=raw, origin=ORIGIN
+            )
+        ) == client_data_json(ch)
         key = ec.generate_private_key(ec.SECP256R1())
-        ad = hashlib.sha256(RP_ID.encode()).digest() + bytes([FLAG_UP | FLAG_UV]) + struct.pack(">I", 3)
+        ad = (
+            hashlib.sha256(RP_ID.encode()).digest()
+            + bytes([FLAG_UP | FLAG_UV])
+            + struct.pack(">I", 3)
+        )
         cd = client_data_json(ch)
         sig = key.sign(ad + hashlib.sha256(cd).digest(), ec.ECDSA(hashes.SHA256()))
         line = assertion_to_response(ad, sig, cd, ch)
@@ -513,8 +580,13 @@ def cmd_selftest(args):
             bytes.fromhex(ad_hex) + hashlib.sha256(client_data_json(ch)).digest(),
             ec.ECDSA(hashes.SHA256()),
         )
-        pub = key.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
-        assert cose_to_uncompressed({1: 2, 3: -7, -1: 1, -2: pub[1:33], -3: pub[33:]}) == pub
+        pub = key.public_key().public_bytes(
+            serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
+        )
+        assert (
+            cose_to_uncompressed({1: 2, 3: -7, -1: 1, -2: pub[1:33], -3: pub[33:]})
+            == pub
+        )
     for bad in (ad[:32] + bytes([FLAG_UV]) + ad[33:],):
         try:
             assertion_to_response(bad, sig, cd, ch)
@@ -533,14 +605,22 @@ def cmd_selftest(args):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("--port", help="serial port of the Flipper (default: the only one found)")
+    p.add_argument(
+        "--port", help="serial port of the Flipper (default: the only one found)"
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
     e = sub.add_parser("enroll", help="Flipper unlocked; hold OK on it to confirm")
     e.add_argument("--label")
-    e.add_argument("--require-uv", action="store_true", help="refuse unlocks without PIN/biometry on the authenticator")
+    e.add_argument(
+        "--require-uv",
+        action="store_true",
+        help="refuse unlocks without PIN/biometry on the authenticator",
+    )
     sub.add_parser("unlock", help="Flipper locked; approve on this computer")
     sub.add_parser("status")
-    f = sub.add_parser("forget", help="revoke on the Flipper and delete the local record")
+    f = sub.add_parser(
+        "forget", help="revoke on the Flipper and delete the local record"
+    )
     f.add_argument("--local-only", action="store_true")
     f.add_argument("--uid", help="with --local-only: only this Flipper's record")
     sub.add_parser("revoke-all", help="revoke every computer on the Flipper")
