@@ -31,6 +31,14 @@ void crypto_cli_encrypt(PipeSide* pipe, FuriString* args) {
             break;
         }
 
+        if(key_slot == FURI_HAL_CRYPTO_ENCLAVE_UNIQUE_KEY_SLOT) {
+            // The device-unique key protects data the firmware stores (such as the
+            // host sign-in key file MAC). A chosen-IV oracle on it would let anyone
+            // with USB access forge those, so it is not offered here.
+            printf("Slot %d is reserved for the firmware", key_slot);
+            break;
+        }
+
         if(!args_read_hex_bytes(args, iv, 16)) {
             printf("Incorrect or missing IV, expected 16 bytes in hex");
             break;
@@ -103,6 +111,14 @@ void crypto_cli_decrypt(PipeSide* pipe, FuriString* args) {
     do {
         if(!args_read_int_and_trim(args, &key_slot) || !(key_slot > 0 && key_slot <= 100)) {
             printf("Incorrect or missing slot, expected int 1-100");
+            break;
+        }
+
+        if(key_slot == FURI_HAL_CRYPTO_ENCLAVE_UNIQUE_KEY_SLOT) {
+            // The device-unique key protects data the firmware stores (such as the
+            // host sign-in key file MAC). A chosen-IV oracle on it would let anyone
+            // with USB access forge those, so it is not offered here.
+            printf("Slot %d is reserved for the firmware", key_slot);
             break;
         }
 

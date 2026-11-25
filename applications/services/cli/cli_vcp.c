@@ -8,6 +8,7 @@
 #include <toolbox/api_lock.h>
 #include "cli_main_shell.h"
 #include "cli_main_commands.h"
+#include "cli_vcp_locked.h"
 
 #define TAG "CliVcp"
 
@@ -25,6 +26,7 @@
 typedef struct {
     enum {
         CliVcpMessageTypeEnable,
+        CliVcpMessageTypeEnableLocked,
         CliVcpMessageTypeDisable,
     } type;
     FuriApiLock api_lock;
@@ -57,6 +59,11 @@ struct CliVcp {
 
     CliRegistry* main_registry;
     CliShell* shell;
+
+    // Locked mode: the device is PIN-locked and only the commands in
+    // locked_registry (host sign-in) are reachable. No external (SD) commands.
+    bool locked_mode;
+    CliRegistry* locked_registry;
 };
 
 // ============
@@ -168,6 +175,47 @@ static void cli_vcp_shell_ready(PipeSide* pipe, void* context) {
     cli_vcp_maybe_receive_data(cli_vcp);
 }
 
+static void cli_vcp_locked_motd(void* context) {
+    UNUSED(context);
+    printf("\r\nFlipper is locked. Only host sign-in is available here.\r\n"
+           "Unlock on the device, or run `hostauth` from an enrolled computer.\r\n");
+}
+
+static void cli_vcp_shell_start(CliVcp* cli_vcp) {
+    PipeSideBundle bundle = pipe_alloc(VCP_BUF_SIZE, 1);
+    cli_vcp->own_pipe = bundle.alices_side;
+    cli_vcp->shell_pipe = bundle.bobs_side;
+    pipe_attach_to_event_loop(cli_vcp->own_pipe, cli_vcp->event_loop);
+    pipe_set_callback_context(cli_vcp->own_pipe, cli_vcp);
+    pipe_set_data_arrived_callback(
+        cli_vcp->own_pipe, cli_vcp_data_from_shell, FuriEventLoopEventFlagEdge);
+    pipe_set_space_freed_callback(
+        cli_vcp->own_pipe, cli_vcp_shell_ready, FuriEventLoopEventFlagEdge);
+    if(cli_vcp->locked_mode) {
+        // No external command config: nothing is loaded from the SD card while locked
+        cli_vcp->shell = cli_shell_alloc(
+            cli_vcp_locked_motd, NULL, cli_vcp->shell_pipe, cli_vcp->locked_registry, NULL);
+    } else {
+        cli_vcp->shell = cli_shell_alloc(
+            cli_main_motd, NULL, cli_vcp->shell_pipe, cli_vcp->main_registry, &cli_main_ext_config);
+    }
+    cli_shell_start(cli_vcp->shell);
+}
+
+static void cli_vcp_shell_stop(CliVcp* cli_vcp) {
+    // disconnect our side of the pipe
+    pipe_detach_from_event_loop(cli_vcp->own_pipe);
+    pipe_free(cli_vcp->own_pipe);
+    cli_vcp->own_pipe = NULL;
+
+    // wait for shell to stop
+    cli_shell_join(cli_vcp->shell);
+    cli_shell_free(cli_vcp->shell);
+    cli_vcp->shell = NULL;
+    pipe_free(cli_vcp->shell_pipe);
+    cli_vcp->shell_pipe = NULL;
+}
+
 /**
  * Processes messages arriving from other threads
  */
@@ -178,15 +226,31 @@ static void cli_vcp_message_received(FuriEventLoopObject* object, void* context)
 
     switch(message.type) {
     case CliVcpMessageTypeEnable:
-        if(cli_vcp->is_enabled) break;
-        FURI_LOG_D(TAG, "Enabling");
+    case CliVcpMessageTypeEnableLocked: {
+        bool locked_mode = message.type == CliVcpMessageTypeEnableLocked;
+        if(cli_vcp->is_enabled) {
+            if(cli_vcp->locked_mode != locked_mode) {
+                FURI_LOG_I(TAG, "Switching to %s mode", locked_mode ? "locked" : "normal");
+                cli_vcp->locked_mode = locked_mode;
+                // Restart the shell so it picks up the other registry. The host keeps
+                // its serial port open and sees a fresh prompt.
+                if(cli_vcp->is_connected) {
+                    cli_vcp_shell_stop(cli_vcp);
+                    cli_vcp_shell_start(cli_vcp);
+                }
+            }
+            break;
+        }
+        FURI_LOG_D(TAG, "Enabling%s", locked_mode ? " (locked)" : "");
         cli_vcp->is_enabled = true;
+        cli_vcp->locked_mode = locked_mode;
 
         // switch usb mode
         cli_vcp->previous_interface = furi_hal_usb_get_config();
         furi_hal_usb_set_config(&usb_cdc_single, NULL);
         furi_hal_cdc_set_callbacks(VCP_IF_NUM, &cdc_callbacks, cli_vcp);
         break;
+    }
 
     case CliVcpMessageTypeDisable:
         if(!cli_vcp->is_enabled) break;
@@ -239,15 +303,7 @@ static void cli_vcp_process_internal_event(CliVcp* cli_vcp, CliVcpInternalEvent 
         FURI_LOG_D(TAG, "Disconnected");
         cli_vcp->is_connected = false;
 
-        // disconnect our side of the pipe
-        pipe_detach_from_event_loop(cli_vcp->own_pipe);
-        pipe_free(cli_vcp->own_pipe);
-        cli_vcp->own_pipe = NULL;
-
-        // wait for shell to stop
-        cli_shell_join(cli_vcp->shell);
-        cli_shell_free(cli_vcp->shell);
-        pipe_free(cli_vcp->shell_pipe);
+        cli_vcp_shell_stop(cli_vcp);
         break;
     }
 
@@ -256,20 +312,8 @@ static void cli_vcp_process_internal_event(CliVcp* cli_vcp, CliVcpInternalEvent 
         FURI_LOG_D(TAG, "Connected");
         cli_vcp->is_connected = true;
 
-        // start shell thread
-        PipeSideBundle bundle = pipe_alloc(VCP_BUF_SIZE, 1);
-        cli_vcp->own_pipe = bundle.alices_side;
-        cli_vcp->shell_pipe = bundle.bobs_side;
-        pipe_attach_to_event_loop(cli_vcp->own_pipe, cli_vcp->event_loop);
-        pipe_set_callback_context(cli_vcp->own_pipe, cli_vcp);
-        pipe_set_data_arrived_callback(
-            cli_vcp->own_pipe, cli_vcp_data_from_shell, FuriEventLoopEventFlagEdge);
-        pipe_set_space_freed_callback(
-            cli_vcp->own_pipe, cli_vcp_shell_ready, FuriEventLoopEventFlagEdge);
         furi_delay_ms(33); // we are too fast, minicom isn't ready yet
-        cli_vcp->shell = cli_shell_alloc(
-            cli_main_motd, NULL, cli_vcp->shell_pipe, cli_vcp->main_registry, &cli_main_ext_config);
-        cli_shell_start(cli_vcp->shell);
+        cli_vcp_shell_start(cli_vcp);
         break;
     }
     }
@@ -303,6 +347,7 @@ static CliVcp* cli_vcp_alloc(void) {
         cli_vcp);
 
     cli_vcp->main_registry = furi_record_open(RECORD_CLI);
+    cli_vcp->locked_registry = cli_registry_alloc();
 
     return cli_vcp;
 }
@@ -347,4 +392,17 @@ void cli_vcp_disable(CliVcp* cli_vcp) {
         .type = CliVcpMessageTypeDisable,
     };
     cli_vcp_synchronous_request(cli_vcp, &message);
+}
+
+void cli_vcp_enable_locked(CliVcp* cli_vcp) {
+    furi_check(cli_vcp);
+    CliVcpMessage message = {
+        .type = CliVcpMessageTypeEnableLocked,
+    };
+    cli_vcp_synchronous_request(cli_vcp, &message);
+}
+
+CliRegistry* cli_vcp_get_locked_registry(CliVcp* cli_vcp) {
+    furi_check(cli_vcp);
+    return cli_vcp->locked_registry;
 }
