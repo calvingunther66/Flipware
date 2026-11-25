@@ -89,7 +89,7 @@ static void js_vgm_delta_yaw(struct mjs* mjs) {
         mjs_prepend_errorf(
             mjs,
             MJS_BAD_ARGS_ERROR,
-            "Invalid args. Pass (angle [, timeout]). Got %d args.",
+            "Invalid args. Pass (angle [, timeout]). Got %zu args.",
             num_args);
         mjs_return(mjs, mjs_mk_undefined());
         return;
@@ -180,12 +180,7 @@ static bool js_vgm_gpio_run(struct mjs* mjs, uint8_t op, uint8_t arg, uint16_t* 
     }
     if(result[0] != CoprocGpioStatusOk) {
         JS_ERROR_AND_RETURN_VAL(
-            mjs,
-            MJS_BAD_ARGS_ERROR,
-            false,
-            "GPIO %d: %s",
-            pin,
-            js_vgm_gpio_status_name(result[0]));
+            mjs, MJS_BAD_ARGS_ERROR, false, "GPIO %d: %s", pin, js_vgm_gpio_status_name(result[0]));
     }
 
     if(value) *value = (uint16_t)(result[1] | (result[2] << 8));

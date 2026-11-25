@@ -172,7 +172,7 @@ bool felica_load(FelicaData* data, FlipperFormat* ff, uint32_t version) {
                    ff, furi_string_get_cstr(str_key_buffer), str_data_buffer))
                 break;
 
-            if(!sscanf(furi_string_get_cstr(str_data_buffer), "%04hX", &system_code)) {
+            if(sscanf(furi_string_get_cstr(str_data_buffer), "%04hX", &system_code) != 1) {
                 break;
             }
 
@@ -226,10 +226,10 @@ bool felica_load(FelicaData* data, FlipperFormat* ff, uint32_t version) {
                     FelicaService* service = simple_array_get(system->services, i);
 
                     // all unread in the beginning. reserved for future block load
-                    if(!sscanf(
+                    if(sscanf(
                            furi_string_get_cstr(str_data_buffer),
                            "| Code %04hX |",
-                           &service->code)) {
+                           &service->code) != 1) {
                         break;
                     }
                     service->attr = service->code & 0x3F;
@@ -558,7 +558,7 @@ static bool felica_calculate_mac(
 
     felica_reverse_copy_block(rc, iv);
     felica_reverse_copy_block(first_block, reverse_data);
-    uint8_t i = 0;
+    size_t i = 0;
     bool error = false;
     do {
         if(mbedtls_des3_crypt_cbc(ctx, MBEDTLS_DES_ENCRYPT, 8, iv, reverse_data, out) == 0) {

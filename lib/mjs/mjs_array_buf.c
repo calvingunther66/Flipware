@@ -310,7 +310,7 @@ static mjs_val_t
 
     if(mjs_is_array(arr)) {
         char* buf_ptr = mjs_array_buf_get_ptr(mjs, buf_obj, NULL);
-        for(uint8_t i = 0; i < elements_nb; i++) {
+        for(size_t i = 0; i < elements_nb; i++) {
             int64_t value = mjs_get_double(mjs, mjs_array_get(mjs, arr, i));
             set_value(buf_ptr, value, type);
             buf_ptr += element_len;

@@ -5,7 +5,6 @@
 
 #define TAG "Coproc"
 
-
 // Default local fallbacks, wired to Momentum's existing crc32/compress
 // utilities so behavior is unchanged when no module is connected. See
 // coproc.h for why CoprocTaskCrc32 in particular is a pipeline smoke test,
@@ -37,8 +36,8 @@ static bool coproc_fallback_compress(
     Compress* compress =
         compress_alloc(CompressTypeHeatshrink, &compress_config_heatshrink_default);
     size_t result_size = 0;
-    const bool success = compress_encode(
-        compress, (uint8_t*)input, input_size, output, *output_size, &result_size);
+    const bool success =
+        compress_encode(compress, (uint8_t*)input, input_size, output, *output_size, &result_size);
     compress_free(compress);
 
     if(success) *output_size = result_size;
@@ -56,8 +55,8 @@ static bool coproc_fallback_decompress(
     Compress* compress =
         compress_alloc(CompressTypeHeatshrink, &compress_config_heatshrink_default);
     size_t result_size = 0;
-    const bool success = compress_decode(
-        compress, (uint8_t*)input, input_size, output, *output_size, &result_size);
+    const bool success =
+        compress_decode(compress, (uint8_t*)input, input_size, output, *output_size, &result_size);
     compress_free(compress);
 
     if(success) *output_size = result_size;

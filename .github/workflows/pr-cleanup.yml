@@ -5,6 +5,8 @@ on:
     types:
       - closed
 
+permissions: {}
+
 jobs:
   pr-cleanup:
     runs-on: ubuntu-latest
