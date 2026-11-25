@@ -46,7 +46,11 @@ static void input_cli_dump(PipeSide* pipe, FuriString* args, FuriPubSub* event_p
 
 static void fake_input(FuriPubSub* event_pubsub, InputKey key, InputType type) {
     bool wrap = type == InputTypeShort || type == InputTypeLong;
-    InputEvent event;
+    // Marked as software so that prompts which must be answered on the device
+    // itself (host sign-in enrollment) ignore it. Hardware events are source 0,
+    // and this struct used to be left uninitialized.
+    InputEvent event = {0};
+    event.sequence_source = INPUT_SEQUENCE_SOURCE_SOFTWARE;
     event.key = key;
 
     if(wrap) {

@@ -51,6 +51,10 @@ typedef enum {
     /* Index of FS directory entry corresponding to FW update to be applied */
     FuriHalRtcRegisterUpdateFolderFSIndex,
     FuriHalRtcRegisterPinValue, /**< Encoded value of the currently set PIN */
+    FuriHalRtcRegisterHostAuthEpoch, /**< Host sign-in: anti-rollback value of the key file */
+    FuriHalRtcRegisterHostAuthCounter, /**< Host sign-in: monotonic challenge counter */
+    FuriHalRtcRegisterHostAuthFails, /**< Host sign-in: failed responses since last unlock */
+    FuriHalRtcRegisterHostAuthFailTime, /**< Host sign-in: RTC timestamp of the last failure */
 
     FuriHalRtcRegisterMAX, /**< Service value, do not use */
 } FuriHalRtcRegister;

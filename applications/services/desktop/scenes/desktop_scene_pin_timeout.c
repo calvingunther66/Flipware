@@ -32,6 +32,11 @@ bool desktop_scene_pin_timeout_on_event(void* context, SceneManagerEvent event) 
             scene_manager_previous_scene(desktop->scene_manager);
             consumed = true;
             break;
+        case DesktopGlobalApiUnlock:
+            // Host sign-in (or the RPC unlock API) while a PIN timeout is running
+            desktop_unlock(desktop);
+            consumed = true;
+            break;
         }
     }
 

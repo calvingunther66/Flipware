@@ -1,6 +1,8 @@
 #include "desktop_i.h"
 
 #include <cli/cli_vcp.h>
+#include <cli/cli_vcp_locked.h>
+#include "helpers/host_auth.h"
 
 #include <gui/gui_i.h>
 
@@ -384,6 +386,8 @@ static Desktop* desktop_alloc(void) {
 
     desktop->app_running = loader_is_locked(desktop->loader);
 
+    host_auth_init();
+
     furi_record_create(RECORD_DESKTOP, desktop);
 
     desktop->archive_dir = furi_string_alloc();
@@ -409,7 +413,12 @@ void desktop_lock(Desktop* desktop, bool with_pin) {
     if(with_pin) {
         if(!momentum_settings.allow_locked_rpc_usb) {
             CliVcp* cli_vcp = furi_record_open(RECORD_CLI_VCP);
-            cli_vcp_disable(cli_vcp);
+            if(host_auth_is_enrolled()) {
+                // Keep USB up, but only for host sign-in (see documentation/HostAuth.md)
+                cli_vcp_enable_locked(cli_vcp);
+            } else {
+                cli_vcp_disable(cli_vcp);
+            }
             furi_record_close(RECORD_CLI_VCP);
         }
         if(!momentum_settings.allow_locked_rpc_ble) {
@@ -443,6 +452,8 @@ void desktop_unlock(Desktop* desktop) {
     bool with_pin = furi_hal_rtc_is_flag_set(FuriHalRtcFlagLock);
     furi_hal_rtc_reset_flag(FuriHalRtcFlagLock);
     furi_hal_rtc_set_pin_fails(0);
+    // Any unlock, PIN included, ends the host sign-in backoff
+    host_auth_on_unlock();
 
     if(with_pin) {
         if(!momentum_settings.allow_locked_rpc_usb) {
