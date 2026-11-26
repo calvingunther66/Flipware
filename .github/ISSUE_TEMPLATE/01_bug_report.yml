@@ -5,7 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for taking the time to fill out an issue, this template is meant for any issues related to the Flipper Zero unleashed firmware.
+        Thank you for taking the time to fill out an issue, this template is meant for any issues related to the Flipware firmware.
+
+        Security problems (the PIN lock, host sign-in, U2F, the expansion port) should not be filed here. Please report them privately, as described in [SECURITY.md](https://github.com/calvingunther66/Flipware/blob/dev/SECURITY.md).
   - type: textarea
     id: description
     attributes:
@@ -29,7 +31,7 @@ body:
     id: target
     attributes:
       label: Target
-      description: Specify the target
+      description: Specify the target and the Flipware build (version shown in Settings, or the commit)
       # Target seems to be largely ignored by outside sources.
   - type: textarea
     id: logs

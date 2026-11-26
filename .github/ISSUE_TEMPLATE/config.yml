@@ -1,1 +1,5 @@
 blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/calvingunther66/Flipware/security/advisories/new
+    about: Report problems with the PIN lock, host sign-in, U2F or the expansion port privately. Please do not open a public issue.
