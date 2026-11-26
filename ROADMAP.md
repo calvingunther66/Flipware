@@ -78,16 +78,16 @@ the NFC protocol-plugin split. What is missing is mostly around it:
 
 ## Timeline
 
-| Stage | Window (target) | Theme | Release |
-|---|---|---|---|
-| 0 | Dec 2026 (3 weeks) | Housekeeping, security fix, honest claims | none (lands in flpw-001) |
-| 1 | Dec 2026 – Jan 2027 | CI gates, emulator tests, bug burndown | **flpw-001** |
-| 2 | Feb – Mar 2027 | Upstream sync, flash and RAM headroom | flpw-002 |
-| 3 | Apr – Jun 2027 | VGM desktop, display stream, coproc v2 | flpw-003 + VGM firmware 1.0 |
-| 4 | Jun – Aug 2027 | Sub-GHz, NFC, RFID, IR, files, battery | flpw-004 |
-| 5 | Aug – Oct 2027 | Wi-Fi updates, composite USB, BLE | flpw-005 |
-| 6 | Oct – Dec 2027 | JS SDK, app kit, docs, upstreaming, tests | flpw-006 |
-| 7 | 2028, as gates open | PKA, FIDO2, full BLE stack, background apps | as ready |
+| Stage | Window (target) | Theme | Release | Tracking |
+|---|---|---|---|---|
+| 0 | Dec 2026 (3 weeks) | Housekeeping, security fix, honest claims | none (lands in flpw-001) | [#25](https://github.com/calvingunther66/Flipware/issues/25) |
+| 1 | Dec 2026 – Jan 2027 | CI gates, emulator tests, bug burndown | **flpw-001** | [#26](https://github.com/calvingunther66/Flipware/issues/26) |
+| 2 | Feb – Mar 2027 | Upstream sync, flash and RAM headroom | flpw-002 | [#27](https://github.com/calvingunther66/Flipware/issues/27) |
+| 3 | Apr – Jun 2027 | VGM desktop, display stream, coproc v2 | flpw-003 + VGM firmware 1.0 | [#28](https://github.com/calvingunther66/Flipware/issues/28) |
+| 4 | Jun – Aug 2027 | Sub-GHz, NFC, RFID, IR, files, battery | flpw-004 | [#29](https://github.com/calvingunther66/Flipware/issues/29) |
+| 5 | Aug – Oct 2027 | Wi-Fi updates, composite USB, BLE | flpw-005 | [#30](https://github.com/calvingunther66/Flipware/issues/30) |
+| 6 | Oct – Dec 2027 | JS SDK, app kit, docs, upstreaming, tests | flpw-006 | [#31](https://github.com/calvingunther66/Flipware/issues/31) |
+| 7 | 2028, as gates open | PKA, FIDO2, full BLE stack, background apps | as ready | [#32](https://github.com/calvingunther66/Flipware/issues/32) |
 
 ```mermaid
 flowchart LR
@@ -112,11 +112,15 @@ Priorities used below: **Must** (the stage doesn't ship without it),
 
 ## Stage 0: Housekeeping and honest claims
 
+Tracking issue: [#25](https://github.com/calvingunther66/Flipware/issues/25)
+
 *December 2026, about three weeks.* Close the one security gap found, make
 the public claims match the code, and replace what Flipware inherited but
 doesn't use. Nothing here needs new hardware.
 
 ### 0.1 Close the expansion port while the PIN lock is on · Must
+
+Issue: [#33](https://github.com/calvingunther66/Flipware/issues/33)
 
 - Refuse `RpcOwnerUart` sessions while `FuriHalRtcFlagLock` is set, unless a
   new setting allows it (next to `allow_locked_rpc_usb` and
@@ -138,6 +142,8 @@ PIN-locked Flipper by default, and an emulator check (`./flipperemu expansion
 
 ### 0.2 Make the public claims match the code · Must
 
+Issue: [#34](https://github.com/calvingunther66/Flipware/issues/34)
+
 - In `ReadMe.md` and `website/public/index.html`, say that the HDMI desktop
   and the USB display stream run on Flipware's VGM firmware, which is in
   preview until Stage 3, and link to it.
@@ -154,6 +160,8 @@ released build or clearly labelled as a preview with a link.
 
 ### 0.3 Project files · Must
 
+Issue: [#35](https://github.com/calvingunther66/Flipware/issues/35)
+
 - Write `CONTRIBUTING.md`: how to build, the PR template, API bump rules
   (`api_symbols.csv` for f7 and f18), changelog lines, the size report, how
   AI-assisted PRs are reviewed, and how upstream authors are credited.
@@ -166,6 +174,8 @@ released build or clearly labelled as a preview with a link.
 
 ### 0.4 A Flipware changelog · Must
 
+Issue: [#36](https://github.com/calvingunther66/Flipware/issues/36)
+
 - Move Momentum's unreleased changelog to
   `documentation/upstream/MomentumChangelog.md`.
 - Start a Flipware `CHANGELOG.md`, backfilled from the 18 merged PRs (#1 to
@@ -176,6 +186,8 @@ released build or clearly labelled as a preview with a link.
   released.
 
 ### 0.5 CI cleanup · Must
+
+Issue: [#37](https://github.com/calvingunther66/Flipware/issues/37)
 
 - Remove the indexer upload, DFU size, PR comment and devbuild webhook steps:
   they always skip, and they would call Momentum's servers if the secret were
@@ -199,11 +211,15 @@ changelog exists.
 
 ## Stage 1: Quality gates and the first release
 
+Tracking issue: [#26](https://github.com/calvingunther66/Flipware/issues/26)
+
 *December 2026 to January 2027, about seven weeks. Ships `flpw-001`.* Build
 the safety net (size gate, host tests, emulator tests), burn down known bugs,
 and publish the first release.
 
 ### 1.1 A working release pipeline · Must
+
+Issue: [#38](https://github.com/calvingunther66/Flipware/issues/38)
 
 - On a `flpw-*` tag, attach to a GitHub release: the update `.tgz` for
   qFlipper, the SD update `.zip`, `firmware.dfu`, the SDK zip and
@@ -218,6 +234,8 @@ and publish the first release.
 **Done when** pushing a tag produces a complete release with no manual steps.
 
 ### 1.2 A flash and RAM report on every PR · Must
+
+Issue: [#39](https://github.com/calvingunther66/Flipware/issues/39)
 
 - Add a script that reads `firmware.elf` and the radio address from
   `update.fuf` and reports:
@@ -237,6 +255,8 @@ The baseline is an 879,316-byte image with 1.3 KiB to the radio stack.
 
 ### 1.3 Host tests in CI · Must
 
+Issue: [#40](https://github.com/calvingunther66/Flipware/issues/40)
+
 - Add a job that checks out `lib/mbedtls` and runs
   `tests/host/host_auth/run.sh`, `tests/host/lfrfid_manual_format/run.sh` and
   `applications/main/subghz/helpers/tests/subghz_compare_test.c`.
@@ -245,6 +265,8 @@ The baseline is an 879,316-byte image with 1.3 KiB to the radio stack.
   hardware. Add an `fbt` target that runs all host tests.
 
 ### 1.4 Emulator tests in CI · Must
+
+Issue: [#41](https://github.com/calvingunther66/Flipware/issues/41)
 
 - Build the FlipperEmu fork (QEMU-based) once into a cached container image,
   pinned to a commit.
@@ -263,6 +285,8 @@ The baseline is an 879,316-byte image with 1.3 KiB to the radio stack.
 goes red.
 
 ### 1.5 Bug burndown · Must
+
+Issue: [#42](https://github.com/calvingunther66/Flipware/issues/42)
 
 Triage FlipperEmu's bug list against Flipware. Fix what reproduces, and add a
 regression check for each fix.
@@ -292,6 +316,8 @@ reason.
 
 ### 1.6 Host sign-in on real hardware · Must
 
+Issue: [#43](https://github.com/calvingunther66/Flipware/issues/43)
+
 - Run the hardware checklist at the end of `documentation/HostAuth.md` with
   the Mac tool (Secure Enclave) and the Windows/Linux tool (python-fido2).
 - Fix what fails, then remove the "untested" notes from the docs and both
@@ -299,6 +325,8 @@ reason.
 - Decide whether host sign-in ships in `flpw-001` enabled, opt-in or hidden.
 
 ### 1.7 Ship flpw-001 · Must
+
+Issue: [#44](https://github.com/calvingunther66/Flipware/issues/44)
 
 - Freeze features and tag `flpw-001-rc1`.
 - Run a device pass covering:
@@ -321,11 +349,15 @@ host tests and emulator checks.
 
 ## Stage 2: Upstream sync and the flash and RAM diet
 
+Tracking issue: [#27](https://github.com/calvingunther66/Flipware/issues/27)
+
 *February to March 2027, about eight weeks. Ships `flpw-002`.* Catch up with
 six months of upstream work, then make room. Almost everything after this
 stage needs flash or RAM that doesn't exist today.
 
 ### 2.1 Upstream sync playbook and first sync · Must
+
+Issue: [#45](https://github.com/calvingunther66/Flipware/issues/45)
 
 - Add remotes for Momentum (`Next-Flip/Momentum-Firmware` `dev`), Unleashed
   and the official firmware. Write `documentation/UpstreamSync.md` covering:
@@ -347,6 +379,8 @@ stage needs flash or RAM that doesn't exist today.
   patching apps.
 
 ### 2.2 Find the bytes · Must
+
+Issue: [#46](https://github.com/calvingunther66/Flipware/issues/46)
 
 - Turn on the linker map and extend the 1.2 report to attribute flash by
   directory and library. A first estimate, grouped by symbol name:
@@ -372,6 +406,8 @@ stage needs flash or RAM that doesn't exist today.
 
 ### 2.3 Sub-GHz decoders as SD plugins · Should
 
+Issue: [#47](https://github.com/calvingunther66/Flipware/issues/47)
+
 - Start with a design spike:
   - Keep the protocol registry API in firmware, along with every protocol
     whose functions appear in `api_symbols.csv` (used by Add Manually,
@@ -387,12 +423,16 @@ stage needs flash or RAM that doesn't exist today.
 
 ### 2.4 Smaller flash wins · Could
 
+Issue: [#48](https://github.com/calvingunther66/Flipware/issues/48)
+
 - Move mJS into the JS app (77 exported functions) at the next API major
   bump agreed with Momentum.
 - Remove duplicate built-in fonts. Move rarely used built-in icons and
   animations to SD asset packs.
 
 ### 2.5 RAM headroom · Must
+
+Issue: [#49](https://github.com/calvingunther66/Flipware/issues/49)
 
 - Re-land the Sub-GHz lazy receive-buffer allocation (`ecf4ae2`, reverted in
   `a266091`): reproduce the reboot in the emulator, find the cause, fix it.
@@ -410,12 +450,16 @@ released.
 
 ## Stage 3: The Video Game Module platform
 
+Tracking issue: [#28](https://github.com/calvingunther66/Flipware/issues/28)
+
 *April to June 2027, about ten weeks. Ships `flpw-003` and Flipware VGM
 firmware 1.0.* This turns the VGM from a screen mirror into Flipware's
 signature feature: a desktop on HDMI and over USB, and a coprocessor and
 bus expander that apps can use.
 
 ### 3.1 A home and a release for the VGM firmware · Must
+
+Issue: [#50](https://github.com/calvingunther66/Flipware/issues/50)
 
 - In the VGM fork, merge `feature/coproc-offload` and `feature/idea-list` into
   a `flipware` branch and make it the default. Its `dev` is still upstream's.
@@ -429,6 +473,8 @@ bus expander that apps can use.
 - Check the upstream VGM firmware's license and credit it.
 
 ### 3.2 Coprocessor protocol v2 · Must
+
+Issue: [#51](https://github.com/calvingunther66/Flipware/issues/51)
 
 - **A hello exchange:** firmware version, protocol version, a bitmap of
   supported tasks, the largest payload and the baud rate. With it,
@@ -452,6 +498,8 @@ bus expander that apps can use.
 
 ### 3.3 The VGM as a bus expander · Should
 
+Issue: [#52](https://github.com/calvingunther66/Flipware/issues/52)
+
 The VGM takes over the Flipper's GPIO header, so give its own 11 breakout
 pins (GPIO 16, 17 and 21-29, with ADC on 26-29) what the header could do:
 
@@ -463,6 +511,8 @@ Expose these through the `vgm` CLI, the JS `vgm` module and its typings, and
 a VGM screen in the GPIO app.
 
 ### 3.4 VGM desktop 1.0 · Must
+
+Issue: [#53](https://github.com/calvingunther66/Flipware/issues/53)
 
 **On the RP2040** (`app/desktop/*`):
 - Page through folders larger than `DT_MAX_FILES` (48 entries).
@@ -482,6 +532,8 @@ the main screens.
 
 ### 3.5 A USB display viewer for computers · Must
 
+Issue: [#54](https://github.com/calvingunther66/Flipware/issues/54)
+
 The VGM streams its 320x240 desktop over a second CDC interface:
 - From the device: HELLO, row-diffed RLE ROW messages and FRAME.
 - From the computer: REFRESH, KEY, CLICK and WHEEL.
@@ -496,6 +548,8 @@ offline. Build:
 
 ### 3.6 Keyboard, mouse and motion through the VGM · Should
 
+Issue: [#55](https://github.com/calvingunther66/Flipware/issues/55)
+
 - Wire up `CoprocTaskHidInject` (task 3; the VGM side exists, nothing on the
   Flipper uses it). Then Bad KB and the USB remote can type and point through
   the VGM's USB-C while the Flipper's own USB stays on qFlipper or the CLI.
@@ -503,6 +557,8 @@ offline. Build:
   mode and an optional tilt navigation.
 
 ### 3.7 Offload jobs that earn their place · Could
+
+Issue: [#56](https://github.com/calvingunther66/Flipware/issues/56)
 
 - Add a `coproc bench` command that times each task locally and offloaded,
   and publish the table. `coproc.h` already notes CRC32 is no faster.
@@ -521,11 +577,15 @@ documented and tested in the emulator and on a VGM.
 
 ## Stage 4: Core apps, made easier
 
+Tracking issue: [#29](https://github.com/calvingunther66/Flipware/issues/29)
+
 *June to August 2027, about ten weeks. Ships `flpw-004`.* Workflow
 improvements every user notices, built mostly as SD apps and plugins so they
 stay within the flash budget.
 
 ### 4.1 Sub-GHz · Must
+
+Issue: [#57](https://github.com/calvingunther66/Flipware/issues/57)
 
 - Compare RAW captures. `subghz_compare` handles decoded keys up to 512 bits;
   BinRAW compares only its first block.
@@ -537,6 +597,8 @@ stay within the flash budget.
   clearly.
 
 ### 4.2 NFC · Should
+
+Issue: [#58](https://github.com/calvingunther66/Flipware/issues/58)
 
 - Texkom: add TK15 to Add Manually, and writing where blanks allow.
 - Compare two `.nfc` dumps block by block, like Sub-GHz compare.
@@ -550,6 +612,8 @@ stay within the flash budget.
 
 ### 4.3 LF RFID and iButton · Should
 
+Issue: [#59](https://github.com/calvingunther66/Flipware/issues/59)
+
 - Port Unleashed's Hitag write targets and per-chip verification on top of
   Flipware's write-target settings.
 - Add a T5577 configuration screen for your own tags, including recovering a
@@ -559,6 +623,8 @@ stay within the flash budget.
 
 ### 4.4 Infrared · Should
 
+Issue: [#60](https://github.com/calvingunther66/Flipware/issues/60)
+
 - Add JVC, Sharp and Denon decoders (these signals are saved as raw today).
 - Refresh the universal remote libraries (`scripts/fix_ir_universals.py`) and
   add air-conditioner presets.
@@ -566,11 +632,15 @@ stay within the flash budget.
 
 ### 4.5 Files and navigation · Should
 
+Issue: [#61](https://github.com/calvingunther66/Flipware/issues/61)
+
 - Archive: search, sort by name, date or size, select several files to move
   or delete, and a recent-files list.
 - One consistent "open with" from any file to the app that handles it.
 
 ### 4.6 Battery and power care · Should
+
+Issue: [#62](https://github.com/calvingunther66/Flipware/issues/62)
 
 - Add a charge-limit setting in Power settings. The driver and HAL already
   support a charge voltage limit (`bq25896_set_vreg_voltage`,
@@ -585,6 +655,8 @@ stay within the flash budget.
 
 ### 4.7 Accessibility and input · Could
 
+Issue: [#63](https://github.com/calvingunther66/Flipware/issues/63)
+
 - Remappable keys and long-press timing (`input_settings_app`).
 - A left-handed (rotated) mode.
 - Larger text on key screens (GUI scaling is a TODO today).
@@ -597,10 +669,14 @@ check, and `flpw-004` is released.
 
 ## Stage 5: Connectivity: Wi-Fi devboard, USB and Bluetooth
 
+Tracking issue: [#30](https://github.com/calvingunther66/Flipware/issues/30)
+
 *August to October 2027, about ten weeks. Ships `flpw-005`.* Updates without
 a computer, USB that does two things at once, and steadier Bluetooth.
 
 ### 5.1 Updates and time over Wi-Fi · Must
+
+Issue: [#64](https://github.com/calvingunther66/Flipware/issues/64)
 
 - With the Wi-Fi devboard running FlipperHTTP (ESP Flasher already ships it):
   - look up the latest `flpw-*` release;
@@ -613,11 +689,15 @@ a computer, USB that does two things at once, and steadier Bluetooth.
 
 ### 5.2 The devboard as an expansion module · Could
 
+Issue: [#65](https://github.com/calvingunther66/Flipware/issues/65)
+
 Teach an ESP32-S2 firmware the expansion protocol and the coproc v2 hello. The
 offload jobs (3.7) and bus bridges (3.3) then work with either module, and
 apps find out what's attached instead of assuming a VGM.
 
 ### 5.3 Composite USB · Should
+
+Issue: [#66](https://github.com/calvingunther66/Flipware/issues/66)
 
 - `furi_hal_usb_set_config` runs one interface at a time, so the CLI and RPC
   drop whenever HID or U2F is active. Add CDC+HID and CDC+mass-storage
@@ -626,6 +706,8 @@ apps find out what's attached instead of assuming a VGM.
 - Fix FW-14 (USB-UART bridge on channel 1).
 
 ### 5.4 The SD card as a USB drive · Should
+
+Issue: [#67](https://github.com/calvingunther66/Flipware/issues/67)
 
 - Add a mass-storage mode for the SD card itself: unmount it from the
   firmware and expose it over USB.
@@ -636,6 +718,8 @@ apps find out what's attached instead of assuming a VGM.
 
 ### 5.5 Bluetooth reliability · Should
 
+Issue: [#68](https://github.com/calvingunther66/Flipware/issues/68)
+
 - Fix FW-17: the BLE serial RPC status sends three stack bytes.
 - Harden pairing and bonding, and check phone-app compatibility with
   FlipperEmu's `ble_check.py` in CI.
@@ -643,6 +727,8 @@ apps find out what's attached instead of assuming a VGM.
   peripheral-only stack) until 7.3.
 
 ### 5.6 Flipware Desktop in the browser · Could
+
+Issue: [#69](https://github.com/calvingunther66/Flipware/issues/69)
 
 Extend the 3.5 viewer to speak protobuf RPC to the Flipper's own USB port: a
 screen mirror (`rpc_gui.c`), a file manager (`rpc_storage.c`) and an app
@@ -655,10 +741,14 @@ release; the CLI survives HID use; `flpw-005` is released.
 
 ## Stage 6: Developer platform and ecosystem
 
+Tracking issue: [#31](https://github.com/calvingunther66/Flipware/issues/31)
+
 *October to December 2027, about eight weeks. Ships `flpw-006`.* Make
 Flipware easy to build on, and shrink the fork's diff.
 
 ### 6.1 A Flipware JS SDK · Must
+
+Issue: [#70](https://github.com/calvingunther66/Flipware/issues/70)
 
 The SDK in `applications/system/js_app/packages/fz-sdk` is still published as
 `@next-flip/fz-sdk-mntm` 1.0.1, but it carries Flipware's `vgm` typings.
@@ -667,6 +757,8 @@ The SDK in `applications/system/js_app/packages/fz-sdk` is still published as
 - Update `documentation/js`, which links to Next-Flip.
 
 ### 6.2 More JS modules · Should
+
+Issue: [#71](https://github.com/calvingunther66/Flipware/issues/71)
 
 The JS app has badusb, blebeacon, event_loop, flipper, gpio, gui, i2c,
 infrared (send only), math, notification, serial, spi, storage, subghz,
@@ -684,6 +776,8 @@ Give each new module a feature flag (`js_modules.c` lists only `vgm` today).
 
 ### 6.3 An app developer kit · Should
 
+Issue: [#72](https://github.com/calvingunther66/Flipware/issues/72)
+
 A template repository with:
 - a ufbt app;
 - a GitHub Action that builds it against the Flipware SDK artifact;
@@ -692,6 +786,8 @@ A template repository with:
 App authors get CI without owning hardware.
 
 ### 6.4 A docs site · Should
+
+Issue: [#73](https://github.com/calvingunther66/Flipware/issues/73)
 
 - Build the Doxygen docs (configured, never built), the feature docs and the
   JS docs into flipware-fw.dev in CI, and deploy the website automatically when
@@ -709,12 +805,16 @@ App authors get CI without owning hardware.
 
 ### 6.5 Bundled apps · Could
 
+Issue: [#74](https://github.com/calvingunther66/Flipware/issues/74)
+
 - Decide which Momentum-Apps ship.
 - Keep the external apps building cleanly.
 - Check each bundled app's compatibility in the emulator on every submodule
   bump.
 
 ### 6.6 Send generic fixes upstream · Should
+
+Issue: [#75](https://github.com/calvingunther66/Flipware/issues/75)
 
 Offer Momentum and the official firmware the fixes that aren't Flipware-specific:
 - the performance pass (PR #12);
@@ -726,6 +826,8 @@ Offer Momentum and the official firmware the fixes that aren't Flipware-specific
 Every one accepted is one less conflict in future syncs.
 
 ### 6.7 Test coverage · Should
+
+Issue: [#76](https://github.com/calvingunther66/Flipware/issues/76)
 
 Add unit suites for areas with none:
 - iButton and 1-Wire;
@@ -750,10 +852,14 @@ app can get CI with emulator runs from the template, docs are online, and
 
 ## Stage 7: Advanced hardware
 
+Tracking issue: [#32](https://github.com/calvingunther66/Flipware/issues/32)
+
 *2028, each epic starting when its gate opens.* Research-sized work that gets
 more out of the STM32WB55 and the modules.
 
 ### 7.1 Hardware public-key crypto · Could
+
+Issue: [#77](https://github.com/calvingunther66/Flipware/issues/77)
 
 - The STM32WB55's PKA is switched on only for Bluetooth (`furi_hal_bt.c:47`).
   U2F (`u2f.c:148`) and host sign-in sign and verify in software with mbedtls.
@@ -762,6 +868,8 @@ more out of the STM32WB55 and the modules.
   elliptic-curve code leave flash.
 
 ### 7.2 A FIDO2 security key · Could
+
+Issue: [#78](https://github.com/calvingunther66/Flipware/issues/78)
 
 U2F is CTAP1 only. Add CTAP2 (passkeys with resident credentials) as an SD
 app:
@@ -773,6 +881,8 @@ It reuses what host sign-in taught about WebAuthn, and needs composite USB
 (5.3) so the CLI can coexist.
 
 ### 7.3 Full Bluetooth stack · Could
+
+Issue: [#79](https://github.com/calvingunther66/Flipware/issues/79)
 
 *Gate: about 64 KiB more free flash than the light stack needs.*
 
@@ -786,11 +896,15 @@ The cost is a bigger radio stack in shared flash; the light stack is 114 KiB.
 
 ### 7.4 Background apps · Could
 
+Issue: [#80](https://github.com/calvingunther66/Flipware/issues/80)
+
 Only one app runs at a time (`loader.c:740`); background work exists only as
 startup hooks such as FindMy's. Generalise that into background apps with RAM
 limits, for example the BLE remote, the UART bridge, beacons and data loggers.
 
 ### 7.5 Large-screen apps on HDMI · Could
+
+Issue: [#81](https://github.com/calvingunther66/Flipware/issues/81)
 
 Let apps draw a 320x240 second screen on the VGM desktop from draw lists sent
 over coproc v2. Examples: a Sub-GHz waterfall, an NFC hex view, logic-analyzer
