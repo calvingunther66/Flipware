@@ -215,6 +215,40 @@ static void test_hid_roundtrips(void) {
     printf("ok   HID formats encode/read back across their ranges\n");
 }
 
+static void test_hid_rejects_bad_parity(void) {
+    static const struct {
+        size_t format;
+        size_t field_bit;
+    } data_bits[] = {
+        {0, 25}, // H10304: frame bit 18 in the second parity group
+        {1, 25}, // H10302
+        {2, 25}, // S10401
+        {3, 27}, // H10306: frame bit 17
+        {4, 42}, // Corporate 1000: frame bit 33
+    };
+
+    FuriString* text = furi_string_alloc();
+    for(size_t i = 0; i < COUNT_OF(data_bits); i++) {
+        const LfRfidHidFormat* fmt = lfrfid_hid_format_get(data_bits[i].format);
+        uint8_t data[6];
+        lfrfid_hid_format_encode(fmt, 0, 0, data);
+        bit_lib_set_bit(
+            data,
+            data_bits[i].field_bit,
+            !bit_lib_get_bit(data, data_bits[i].field_bit));
+
+        furi_string_set(text, "unchanged");
+        lfrfid_hid_format_render(data, text);
+        CHECK(
+            strcmp(furi_string_get_cstr(text), "unchanged") == 0,
+            "HID %s accepted data with bad parity: %s",
+            lfrfid_hid_format_get_name(fmt),
+            furi_string_get_cstr(text));
+    }
+    furi_string_free(text);
+    printf("ok   HID formats reject frames with invalid parity\n");
+}
+
 static void test_casi(void) {
     const uint32_t creds[] = {150000, 151234, 159999};
     const uint32_t cards[] = {0, 1, 195537, 195538, 262143, 262144, 400000, LFRFID_CASI_CARD_MAX};
@@ -236,6 +270,43 @@ static void test_casi(void) {
         }
     }
     printf("ok   Casi-Rusco encode/read back\n");
+}
+
+static void test_casi_rejects_invalid_frames(void) {
+    static const uint32_t invalid_credentials[] = {
+        LFRFID_CASI_CREDENTIAL_MIN - 1,
+        LFRFID_CASI_CREDENTIAL_MAX + 1,
+    };
+
+    FuriString* text = furi_string_alloc();
+    for(size_t i = 0; i < COUNT_OF(invalid_credentials); i++) {
+        uint8_t data[5];
+        lfrfid_casi_format_encode(LFRFID_CASI_CREDENTIAL_MIN, 0, data);
+        for(uint8_t bit = 0; bit < LFRFID_CASI_FIELD_SIZE; bit++) {
+            bit_lib_set_bit(
+                data,
+                2 + bit,
+                (invalid_credentials[i] >> (LFRFID_CASI_FIELD_SIZE - 1 - bit)) & 1);
+        }
+
+        furi_string_set(text, "unchanged");
+        lfrfid_casi_format_render(data, text);
+        CHECK(
+            strcmp(furi_string_get_cstr(text), "unchanged") == 0,
+            "Casi accepted credential %" PRIu32,
+            invalid_credentials[i]);
+    }
+
+    uint8_t data[5];
+    lfrfid_casi_format_encode(LFRFID_CASI_CREDENTIAL_MIN, 0, data);
+    bit_lib_set_bit(data, 0, true);
+    furi_string_set(text, "unchanged");
+    lfrfid_casi_format_render(data, text);
+    CHECK(
+        strcmp(furi_string_get_cstr(text), "unchanged") == 0,
+        "Casi accepted a nonzero reserved prefix");
+    furi_string_free(text);
+    printf("ok   Casi-Rusco rejects invalid credentials and reserved bits\n");
 }
 
 // Reference Wiegand 26: even parity over the first 12 data bits, odd over the last 12
@@ -317,7 +388,9 @@ int main(void) {
         "unknown id has no protocol");
 
     test_hid_roundtrips();
+    test_hid_rejects_bad_parity();
     test_casi();
+    test_casi_rejects_invalid_frames();
     test_pyramid_parity();
 
     printf("\n%d checks, %d failures\n", checks, failures);
