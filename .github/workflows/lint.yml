@@ -1,13 +1,17 @@
 name: "Lint"
 
+# Same triggers as Build: dev and tags on push, everything else via its PR.
 on:
   push:
     branches:
-      - "**"
-      - "!release"
+      - dev
     tags:
       - "*"
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   SET_GH_OUTPUT: 1
@@ -24,6 +28,12 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: "Restore toolchain"
+        uses: actions/cache@v4
+        with:
+          path: toolchain
+          key: fbt-toolchain-${{ runner.os }}-${{ hashFiles('scripts/toolchain/fbtenv.sh') }}
 
       - name: "Check formatting"
         run: ./fbt lint_all
