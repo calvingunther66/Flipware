@@ -1,140 +1,66 @@
-### Added:
-- Apps:
-  - Games: Checkers (by @H4W9)
-  - GPIO: CAN Commander (by @MatthewKuKanich)
-  - NFC:
-    - ISO 15693-3 NFC Writer (by @ch4istO)
-    - UL-C Bruteforce (by @noproto)
-    - UL-C Relay (by @noproto)
-    - ULCFkey (by @noproto)
-  - Sub-GHz: ProtoPirate (by @RocketGod-git & @xMasterX & @zero-mega et al.)
-  - Tools: Flipper Wedge (by @dangerous-tac0s)
-- Sub-GHz:
-  - UL: Add support for 42+ Keeloq based systems (with partial Add Manually support) (by @zero-mega, @xMasterX, ARF Team)
-  - UL: Cardin S449 protocol full support (64bit keeloq) (with Add manually, and all button codes) (use FSK12K modulation to read the remote) (by @xMasterX & @zero-mega)
-  - UL: Beninca ARC AES128 protocol full support (128bit dynamic) (with Add manually, and 2 button codes) (by @xMasterX & @zero-mega)
-  - UL: Jarolift protocol full support (72bit dynamic) (with Add manually, and all button codes) (by @xMasterX & d82k & Steffen (bastelbudenbuben de))
-  - UL: Treadmill37 protocol support (37bit static) (by @xMasterX)
-  - UL: Ditec GOL4 protocol (with programming mode, button switch, add manually) (by @xMasterX & @zero-mega)
-  - UL: KeyFinder protocol (24bit static) (by @xMasterX & @mishamyte)
-  - UL: Nord ICE protocol (33 bits, Static) (by @xMasterX)
-  - UL: Allstar Firefly 318ALD31K protocol (18 bits, Static) (by @jlaughter)
-  - UL: Add CAME TOP44FGN support in CAME TWEE protocol (by @xMasterX)
-  - UL: New modulation FSK with 12KHz deviation (by @xMasterX)
-  - UL: KingGates Stylo 4k Add manually and button switch support and refactoring of encoder (by @xMasterX)
-  - UL: Stilmatic (R-Tech) 12bit discr. fix & button 9 support (two buttons hold simulation) (mapped on arrow keys) (by @xMasterX)
-  - UL: Sommer last button code 0x6 support (mapped on arrow keys) (by @xMasterX)
-  - UL: V2 Phoenix (Phox) added 2 counter modes support (docs updated) (by @xMasterX)
-  - UL: Add 390MHz and 430.5MHz to default hopper list (6 elements like in OFW) (works well with Hopper RSSI level set for your enviroment) (by @xMasterX)
-  - UL: Add signals button editor and real remote simulation (full signal transmit with just one click) (by @Dmitry422)
-  - UL: KeeLoq add counter mode 7 (sends 7 signals increasing counter with 0x3333 steps) - may bypass counter on some receivers! (by @xMasterX)
-  - UL: TX Power setting (by @LeeroysHub)
-  - UL: Somfy Keytis button switch and Add Manually support (by @xMasterX)
-  - UL: Genius Echo/Bravo add 2 buttons hold simulation (0xB btn code) (by @xMasterX)
-  - UL: Add all 0x0s and all 0xFs KeeLoq MF codes for normal and simple learning (by @xMasterX)
-  - UL: Better support for CAME Atomo type remotes (TOPD4REN) (decode + button codes) (by @xMasterX & Roman)
+# Changelog
+
+All notable changes to Flipware. Each release gets its own section, newest
+first. Changes that are merged but not yet in a release are under
+[Unreleased](#unreleased).
+
+Flipware started from Momentum `dev` at `33671b9` plus ports from Unleashed
+(`unlshd-093` and `unlshd-094`). Momentum's own changelog from that point is kept
+for reference in [documentation/upstream/MomentumChangelog.md](documentation/upstream/MomentumChangelog.md);
+it is not part of Flipware's release notes.
+
+**Adding a line:** put one line under Unreleased, in Added, Updated, Fixed or
+Removed, with the PR number. Write it for someone who uses the firmware. Credit
+the original author when the change is a port, for example
+`UL: Add Doorbell32 protocol (by @author)`.
+
+**Releasing:** when a tag such as `flpw-001` is cut, rename `## Unreleased` to
+`## flpw-001 - YYYY-MM-DD` and add a new empty `## Unreleased` above it. The
+release workflow publishes only the section whose heading starts with the tag
+being released (`.github/workflow_data/release.py`), and fails if there is none.
+
+## Unreleased
+
+No release has been tagged yet, so everything since the fork is here.
+
+### Added
+- Video Game Module (VGM):
+  - Coprocessor offload: the Flipper can hand compute jobs to the VGM's RP2040 over the expansion link, with automatic local fallback when no module is attached or a job fails. `storage crc32 <path>` is the demo job. The link is slower than the Flipper's own CPU for per-byte work, so it only pays off for jobs with a small request and a lot of computing (#1)
+  - GPIO expander task for the VGM breakout, with a `vgm` CLI command and JS bindings (#2)
+- Desktop: unlock the PIN lock over USB with a device-bound passkey (Mac Secure Enclave with Touch ID, Windows Hello or a FIDO2 key). The PIN keeps working. Design, limits and what still needs hardware testing: `documentation/HostAuth.md` (#13)
+- Desktop: new setting "Allow Module RPC While Locked" (Interface > Lockscreen), off by default (#85)
+- Power settings: battery health detail page (#2)
 - NFC:
-  - Add Mifare Ultralight C Write Support (#524 by @haw8411)
-  - UL: Add ISO15693-3 and SLIX write-back support (by @DoniyorI)
-  - UL: Add new parsers SZPPK, SKPPK and SevPPK, upgrade Plantain parser, fix TwoCities parser (by @mxcdoam)
-- OFW PR 4343: RFID: Add Indala 224-bit (long format) protocol support (by @kuzaxak)
-- UL: JS: Add IR capabilities to the JS engine (by @LuisMayo)
-- FBT: Allow apps to specify custom cflags (by @WillyJL)
-- UL: Docs: Add [full list of supported SubGHz protocols](https://github.com/Next-Flip/Momentum-Firmware/blob/dev/documentation/SubGHzSupportedSystems.md) and their frequencies/modulations that can be used for reading remotes (by @xMasterX)
-UL: API: Add `canvas_get_buffer`, `canvas_get_buffer_size` to public API (by @xMasterX)
-
-### Updated:
-- Apps:
-  - XERO: MFKey: 4.1 with 40% faster key recovery, improved memory efficiency (by @dchristle), new SEN dictionary for 10x faster recovery (by @noproto)
-  - UL: Update Sub-GHz apps for FM12K modulation (by @xMasterX)
-  - UL: USB/BT Remote: PTT improvements (by @hryamzik)
-  - Ami Tool: Remove copyrighted names, write card fully using low level poller (by @Firefox2100)
-  - CAN Tools: Parity with DBC format, support importing DBC files (by @MatthewKuKanich)
-  - ESP Flasher: Bump Marauder 1.14.3 (by @justcallmekoko) FlipperHTTP 2.1.1 (by @jblanked) Blackmagic 0.1.2-rc (by @hedger), quick flash fix (by @xMasterX), advanced flashing mode (by @H4W9)
-  - ESP32 WiFi Marauder: Marauder 1.12.0 support (by @pfefferle), Marauder 1.10.0 support (by @justcallmekoko), Marauder 1.9.0 support (by @H4W9)
-  - FlipLibrary: Added Fahrenheit, current weather, and wind speed/direction (by @H4W9)
-  - FlipSocial: Autocomplete, keyboard improvements, explore and profile view enhancements, bugfixes (by @jblanked)
-  - FlipWeather: Added Fahrenheit, current weather, and wind speed/direction, custom location option (by @H4W9)
-  - Free Roam: Minimap, code optimization, ux improvements, online mode, option to hide/show player (by @jblanked)
-  - Flipper Blackhat: TUI command (by @o7-machinehum)
-  - Geometry Dash: Major refactor, bugfixes and performance improvements, rename from Geometry Flip (by @gooseprjkt)
-  - GhostESP: Many bugfixes, added Flock Detection, Flock List, and Stop Flock Detection commands (by @jaylikesbunda)
-  - HC-SR04 Distance Sensor: Option to change measure units (by @Tyl3rA)
-  - IconEdit: Save/Send animations, settings tab with canvas scale and cursor guides, bugfixes (by @rdefeo)
-  - INA2xx INA Meter: Fixed application freezing when the sensor is not connected (by @cepetr)
-  - KT0803 FM Transmitter: Many bugfixes (by @nixvio64)
-  - Lidar Emulator: Settings menu with external output and 5V power on support, separate thread for timing the infrared signal (by @ANTodorov)
-  - Lidar Emulator: Support external IR boards (by @ANTodorov)
-  - Metroflip: Bugfixes (by @baalpeteor2)
-  - NearbyFiles: GPS Baudrate selection, Ability to add GPS to file (by @xMasterX)
-  - NFC Login: Code refactor, bugfixes, renamed from NFC PC Login, restore BLE profile on app exit (by @Play2BReal)
-  - Passy: Bugfixes, Save advanced files as well (by @bettse)
-  - Picopass: Option to Create credential without a card (by @redteamlife), info screen improvements, allow Emulation of NRMAC dumped cards, Clean MKF option (by @bettse)
-  - Seader: SAM ATR3 support, better IFSC/IFSD handling, various improvements (by @bettse), reverse engineered U90 packet, SNMP support, multi-card selection, memory optimization, refactoring (by @cindersocket)
-  - Seos Compatible: Seos write support, various improvements (by @aaronjamt), support switching key sets (by @pcunning), code refactoring, various bugfixes (by @bettse)
-  - Sub-GHz Scheduler: Added new interval times, bugfixes and improvements (by @shalebridge)
-  - Tetris: Various bugfixes (by @Bricktech2000)
-  - Unitemp: Numerous improvements from @MLAB-project fork (by @MLAB-project), Many changes, new sensors and code refactoring in v2.0 (by @quen0n)
-  - Weebo: Cycle between .nfc files in the same directory (by @sethgregory), new figure IDs (by @Brickleberry19), bugfixes and refactoring (by @bettse)
-  - XRemote: Add dolphin xp and crash bugfix (by @teohumeau)
-  - Yatzee: Fix Full House calculation, improve code readability (by @zessx)
+  - Hotel key cards (Onity, VingCard) show a "Hotel Key Card" page naming the lock system (based on the official firmware 1.5.1 `hotels` parser) (#9)
+  - Texkom intercom keys TK13, TK15, TK17 and MMBIT: read, save, emulate, Add Manually for TK13, TK17 and MMBIT (UL: by @mishamyte) (#17)
+- RFID 125 kHz: Add Manually by facility code and card number for EM4100 (and EM4100/32, EM4100/16), H10301, AWID, ioProx XSF, Pyramid, Gallagher and the HID Generic formats; Read and Saved screens show the decoded FC and card number for the added HID formats (UL unlshd-094) (#10)
+- iButton and RFID: Settings > Write Targets chooses which blank chips a write may try (RW1990.1, RW1990.2, TM2004, TM01x for iButton; T5577, EM4305 for RFID). The CLI follows the same setting (#19)
+- Infrared: save the working signal from a universal remote, as a new remote or added to an existing one (UL unlshd-093) (#11)
 - Sub-GHz:
-  - Sub-GHz app is now external on SD card, like on OFW (by @WillyJL)
-    - This was done to free some space on flash, which is always running out
-    - It means RAM consumption while using the Sub-GHz app has increased
-    - Usability remains mostly unaffected, our testing showed it can receive up to ~50 signals normally and ~10 signals with qFlipper / Flipper Mobile App connected
-    - You may experience some "out of memory" messages, this is inevitable as RAM eventually fragments and needs to be rearraged, simply resume as normal after the reboot
-  - Add Manually menu transparently refactored into a "separate app" for lower RAM usage, it is still accessed as before from Sub-GHz app (by @WillyJL)
-  - UL: Counter editor refactoring (by @Dmitry422)
-  - UL: Alutech AT-4N & Nice Flor S turbo speedup (by @Dmitry422)
-  - UL: Sommer fm2 in Add manually now uses FM12K modulation (Sommer without fm2 tag uses FM476) (try this if regular option doesn't work for you) (by @xMasterX)
-  - UL: Replaced Cars ignore option with Revers RB2 protocol ignore option (by @xMasterX)
-  - UL: Improve docs on low level code (by @Dmitry422)
-  - UL: KeeLoq display decrypted `Hop` instead of showing encrypted as is (encrypted non byte reversed hop is still displayed in `Key` field) (by @xMasterX)
-  - UL: BFT KeeLoq try decoding with zero seed too (by @xMasterX)
-  - UL: KeeLoq display BFT programming mode TX (when arrow button is held) (by @xMasterX)
-  - UL: Signal Settings Improvements (by @Dmitry422)
-  - UL: KeeLoq change delta size (by @xMasterX)
-- Archive: Support opening and pinning ProtoPirate files from Archive (#510 by @LeeroysHub)
-- Display: Extend lcd contrast range to -10 to +18 (by @ShaTie)
-- OFW PR 4297: RFID: Make FDX-B readout more descriptive (by @snowsign)
-- OFW PR 4320: API: Make `view_port_send_to_back()` public (by @loftyinclination)
+  - Compare two saved captures bit by bit (Saved signal > Compare with...) (#18)
+  - Doorbell32 and KeyFinder2 protocols; Genius remotes read and resend as Genius instead of Faac SLH (UL unlshd-094) (#22)
+  - Apps: Seed Capturer collects Fix and Hop pairs from FAAC SLH, Genius and Erreka remotes, receive-only (UL unlshd-094, original app by @xMasterX) (#21)
+- Project: `ROADMAP.md` (#24), `CONTRIBUTING.md`, `SECURITY.md`, `CODEOWNERS` (#87), a project wiki linked from the ReadMe (#83), and this changelog (#36)
 
-### Fixed:
-- Sub-GHz:
-  - Fix display of memory full (by @WillyJL)
-  - UL: Fixed button mapping for FAAC RC/XT (by @xMasterX)
-  - UL: Possible Sommer timings fix (by @xMasterX)
-  - UL: Various fixes and cleanup (by @xMasterX)
-  - UL: Nice Flor S remove extra uint64 variable (by @xMasterX)
-  - UL: Fix Alutech AT4N false positives (by @xMasterX)
-  - UL: Fix documentation link for HT12A protocol (by @carlogrisetti)
-  - UL: BFT Mitto fix decode bug (seed was not resetting after one successful decode) (by @xMasterX)
-  - UL: KeeLoq fix display of AN-Motors and HCS101 keys (by @xMasterX)
-  - UL: Fix CAME TWEE repeats count for button click (by @xMasterX)
-  - UL: Fix small logic error in KingGatesStylo4k protocol (by @xMasterX & @X-Stuff)
-  - UL: Improve Nice FLO decoding (by @xMasterX & Roman)
-  - UL: Fix duplicate code in RAW protocol (by @xMasterX)
-  - UL: Fix FAAC SLH wrong decode/encode, apply little code cleanup (by @xMasterX)
-- NFC:
-  - Fix sending 32+ byte ISO 15693-3 commands (by @WillyJL)
-  - Fixes to `READ_MULTI` and `GET_BLOCK_SECURITY` commands in ISO 15693-3 emulation (#501 by @WillyJL & aaronjamt)
-  - Fix Type 4 Tag read edge case for cards not supporting specific EF in DF select mode (by @WillyJL)
-  - Fix CLI with NTAG4xx and Type 4 Tag support (by @WillyJL)
-  - UL: Fix LED not blinking at SLIX unlock (by @xMasterX)
-  - UL: Fix "MIR" and other EMV cards crash on Read (by @Dmitry422)
-  - OFW PR 4362: Fix BusFault in Write to Initial Card (by @akrylysov)
-  - OFW PR 4369: Fix stack buffer overflows in MFUL FAST_READ and DESFire file settings parsers (by @qp-x-qp)
-- GUI: Optimize RAM usage of FileBrowser (by @WillyJL)
-- Archive: Fix wrong cursor when opening dirs with more than 220 files (by @WillyJL)
-- uFBT: Fix .clangd config for IDEs besides VSCode (by @WillyJL)
-- UL: Settings: Storage settings exit scenes properly if used via favourites (by @xMasterX)
-- UL: UI: Some small changes (by @xMasterX)
-- OFW PR 4364: JS: Address utf8 support when uploading JavaScript application (by @bekindpleaserewind)
-- OFW PR 4338: USB: Fix USB HID keyboard LED state reporting (by @Caballosanex)
+### Updated
+- Boot screen and updater screen say Flipware instead of Momentum (#20)
+- Passport screen says FLPW·ID instead of MNTM·ID (#86)
+- ReadMe, website and docs say what the code does: the VGM desktop and USB display stream are labelled preview, there is no release yet, and menu paths say Flipware (#86)
+- Performance: faster SD access, app folders load in about half the time (171-app Games folder: 0.75 s to 0.32 s), fewer UI freezes, and lower peak RAM when loading large apps (#12)
+- NFC: the extra screens of each protocol (MIFARE Classic dictionary attack, Ultralight C unlock, SLIX unlock, FeliCa, DESFire and EMV more-info and others) load only while that protocol is in use, shrinking the NFC app's code by about 48% (RogueMaster PR 1073, by Mykhailo Shevchuk) (#23)
+- Build: official-firmware API version mismatch is a warning, not a failure (#15); each PR commit runs one Build and one Lint, Build writes the DFU size and free flash to the job summary, and the toolchain is cached (#84)
 
-### Removed:
-- Sub-GHz:
-  - Removed Starline, ScherKhan and Kia protocols from main Sub-GHz app, they can be decoded with `Apps > Sub-GHz > ProtoPirate` external app
-  - Disabled X10 and Hormann Bisecur protocols due to flash space constraints and very limited usefulness, Momentum now has the same protocol list as Unleashed
-- Desktop: Removed winter holidays anims
+### Fixed
+- Security: while the PIN lock is on, an expansion module could open an RPC session and unlock the Flipper. A locked session now only gets screen mirroring and lock status, and `DesktopUnlockRequest` is refused for it (#85)
+- Fix 22 real bugs from code scanning: an EMV card could make the reader read past its buffer, an NFC tag could hang the vCard parser, a JS array of more than 255 elements hung the Flipper, plus smaller overflow and NULL-write fixes in FeliCa, mJS, Sub-GHz, the message queue and exFAT size checks (#16)
+- Stability: a full USB event queue during a CLI command no longer reboots the device, `storage read_chunks` stops when the host disconnects, loader launch failures report an error instead of rebooting, plus three memory leaks (#12)
+- SD: I/O error retries no longer power-cycle the 3.3V rail while an expansion module is attached (#2)
+- RFID: writing a protocol that no enabled chip can carry shows a message instead of looping forever (#19)
+- RFID: Pyramid parity check no longer reads past its buffer (#10)
+- Repository: stop tracking a Wrangler cache file that held Cloudflare account details, and ignore `.wrangler/` (#8)
+
+### Removed
+- Momentum's instructions telling AI coding assistants to refuse work on the repository (`AGENTS.md`, `.cursor/rules/momentum.mdc`, `.github/copilot-instructions.md`) (#2, #14)
+- Upstream funding links and donation text (`.github/FUNDING.yml`, the Support block in the release notes template) (#87)
+- Momentum's Webhook workflow, which failed on every push (#15)
+- Momentum's changelog, moved to `documentation/upstream/MomentumChangelog.md` (#36)
