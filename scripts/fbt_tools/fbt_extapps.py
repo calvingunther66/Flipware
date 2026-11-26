@@ -1,5 +1,6 @@
 import itertools
 import pathlib
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -381,6 +382,12 @@ def _validate_app_imports(target, source, env):
             "nfc_protocol_support_common_on_event_empty",
             "nfc_unlock_helper_setup_from_state",
             "nfc_unlock_helper_card_detected_handler",
+            # Everything else the NFC app exports: read from the table itself so the list
+            # cannot go stale (it used to be copied here by hand, and the protocol plugins
+            # then warned about symbols that do resolve).
+            *_app_api_table_syms(
+                env, "applications/main/nfc/api/nfc_app_api_table_i.h"
+            ),
         ),
         # totp app_api_table
         ("totp_",): (
@@ -422,6 +429,13 @@ def _validate_app_imports(target, source, env):
             raise UserError(warning_msg)
         else:
             SCons.Warnings.warn(SCons.Warnings.LinkWarning, warning_msg)
+
+
+def _app_api_table_syms(env, header):
+    """Names exported by an app's API table header (API_METHOD / API_VARIABLE entries)."""
+    with open(env.Dir("#").File(header).abspath, "rt") as f:
+        text = f.read()
+    return tuple(re.findall(r"API_(?:METHOD|VARIABLE)\(\s*(\w+)", text))
 
 
 def GetExtAppByIdOrPath(env, app_dir):
