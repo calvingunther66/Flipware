@@ -35,6 +35,15 @@ static void rpc_desktop_on_unlock_request(const PB_Main* request, void* context)
     RpcDesktop* rpc_desktop = context;
     RpcSession* session = rpc_desktop->session;
 
+    // The session worker already refuses this while locked, but an unlock is
+    // the one command that must never get through from a session whose owner
+    // isn't allowed RPC while locked, whatever that owner is
+    if(!rpc_session_is_allowed_while_locked(session)) {
+        FURI_LOG_W(TAG, "UnlockRequest refused: session isn't allowed while locked");
+        rpc_send_and_release_empty(session, request->command_id, PB_CommandStatus_ERROR);
+        return;
+    }
+
     desktop_api_unlock(rpc_desktop->desktop);
 
     rpc_send_and_release_empty(session, request->command_id, PB_CommandStatus_OK);

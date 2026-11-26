@@ -50,6 +50,15 @@ static void
     app->save_settings = true;
 }
 
+static void momentum_app_scene_interface_lockscreen_allow_locked_rpc_expansion_changed(
+    VariableItem* item) {
+    MomentumApp* app = variable_item_get_context(item);
+    bool value = variable_item_get_current_value_index(item);
+    variable_item_set_current_value_text(item, value ? "ON" : "OFF");
+    momentum_settings.allow_locked_rpc_expansion = value;
+    app->save_settings = true;
+}
+
 static void
     momentum_app_scene_interface_lockscreen_lockscreen_poweroff_changed(VariableItem* item) {
     MomentumApp* app = variable_item_get_context(item);
@@ -161,6 +170,17 @@ void momentum_app_scene_interface_lockscreen_on_enter(void* context) {
     variable_item_set_current_value_index(item, momentum_settings.allow_locked_rpc_ble);
     variable_item_set_current_value_text(
         item, momentum_settings.allow_locked_rpc_ble ? "ON" : "OFF");
+
+    // OFF: a module on the GPIO header only gets the screen mirror while locked
+    item = variable_item_list_add(
+        var_item_list,
+        "Allow Module RPC While Locked",
+        2,
+        momentum_app_scene_interface_lockscreen_allow_locked_rpc_expansion_changed,
+        app);
+    variable_item_set_current_value_index(item, momentum_settings.allow_locked_rpc_expansion);
+    variable_item_set_current_value_text(
+        item, momentum_settings.allow_locked_rpc_expansion ? "ON" : "OFF");
 
     item = variable_item_list_add(
         var_item_list,
