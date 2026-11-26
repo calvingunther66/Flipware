@@ -105,24 +105,21 @@ code from them and from other projects. When you bring code in:
 
 ## AI-assisted pull requests
 
-Some Flipware work is written with the help of an AI assistant, and that is
-welcome. The rules are the same as for any pull request, plus:
+Using an AI assistant to write code, tests or docs is fine. Flipware does not
+ban it, and a pull request is not judged by who or what typed it. The usual
+rules apply:
 
-- **Say so.** Name the tool in the pull request description. A commit trailer
-  such as `Co-Authored-By` is enough in the commit itself.
-- **The submitter owns it.** You are responsible for every line, including the
-  license of anything it reproduced. "The assistant wrote it" is not an answer
-  to a review comment.
-- **Review for what an assistant gets wrong.** Reviewers check that every API
-  and symbol exists in this tree (not in another firmware), that new code does
-  not copy from a project without credit, that the change is as small as it
-  claims, and that locking, signing and memory-ownership code was read, not
-  skimmed.
-- **Tests and checks are not optional.** A passing build says the code
-  compiles. The test, the emulator check and the device check say it works, and
-  the pull request has to show which of them were run.
-- **No generated bulk.** Large machine-written changes (mass renames, whole new
-  protocol tables, ported apps) are split into reviewable pull requests.
+- **You own what you submit.** You are responsible for every line, including
+  where it came from and its license.
+- **Reviewers check it like any other change.** They look at whether the APIs
+  and symbols exist in this tree, whether the change is as small as it claims,
+  and whether the lock, signing and memory-handling code is right.
+- **Show that it works.** A passing build only says it compiles. Say which test,
+  emulator check or device check you ran.
+- **Keep it reviewable.** Split large machine-written changes into focused
+  pull requests.
+
+A `Co-Authored-By` trailer in the commit is welcome but not required.
 
 ## Reporting bugs and asking for features
 
