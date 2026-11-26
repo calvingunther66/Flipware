@@ -53,8 +53,8 @@ Every pull request should have:
 2. **A changelog line** in [CHANGELOG.md](CHANGELOG.md), under Added, Updated or
    Fixed. One line, written for someone who uses the firmware, not for someone
    who reads the diff. Credit the original author when the change is not yours
-   (see below). The file is being restarted as a Flipware changelog (roadmap
-   item 0.4); until that lands, add your line under the existing headings.
+   (see below). Put it under `## Unreleased` and add the PR number. When a
+   release is tagged, that section becomes the release notes for the tag.
 3. **The size report reviewed.** Flash is almost full, so a change that grows
    the firmware has to free as much elsewhere or move code to an app on the SD
    card. The Build run's summary lists the API version, the DFU size and the
