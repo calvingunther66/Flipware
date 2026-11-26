@@ -41,6 +41,12 @@ still defines `FW_ORIGIN_Momentum` for apps that check for it.
 What is planned for the next year, stage by stage, is in
 [ROADMAP.md](ROADMAP.md). Each stage has a tracking issue labelled `roadmap`.
 
+## Wiki
+
+How to use each Flipware feature, which ones have been tested on a device,
+how to install and build, and how to contribute are in the
+[wiki](https://github.com/calvingunther66/flipware/wiki).
+
 ## Install
 
 Releases are published on the
