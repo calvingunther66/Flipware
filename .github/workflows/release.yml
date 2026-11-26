@@ -1,59 +1,64 @@
 name: "Release"
 
+# Publishing a GitHub release attaches the update package and SDK that the Build
+# workflow already produced for the release's tag, and fills in the release notes
+# from CHANGELOG.md. Nothing is downloaded from or sent to any outside server.
+#
+# Order of events for a release (see CHANGELOG.md and CONTRIBUTING.md):
+#   1. rename "## Unreleased" in CHANGELOG.md to "## <tag> - <date>" and merge it
+#   2. push the tag; Build runs on it and uploads the packages as an artifact
+#   3. publish the release for that tag; this workflow does the rest
+
 on:
   release:
     types:
       - released
 
+permissions:
+  contents: read
+
 jobs:
   release:
     permissions:
-      contents: write
+      contents: write # edit the release and upload its files
+      actions: read # find and download the tag's Build artifact
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.event.release.tag_name }}
     steps:
       - name: "Checkout code"
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 1
-          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: "Update release notes"
-        env:
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: "Write release notes"
         run: python .github/workflow_data/release.py
 
-      - name: "Download release assets from tag build"
+      - name: "Download packages from the tag's Build run"
         run: |
           set -e
-          wget "${{ secrets.INDEXER_URL }}"/builds/firmware/${{ github.event.release.tag_name }}/flipper-z-f7-update-${{ github.event.release.tag_name }}.tgz
-          wget "${{ secrets.INDEXER_URL }}"/builds/firmware/${{ github.event.release.tag_name }}/flipper-z-f7-update-${{ github.event.release.tag_name }}.zip
-          wget "${{ secrets.INDEXER_URL }}"/builds/firmware/${{ github.event.release.tag_name }}/flipper-z-f7-sdk-${{ github.event.release.tag_name }}.zip
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml \
+            --branch "$TAG" --status success --limit 1 \
+            --json databaseId --jq '.[0].databaseId')
+          if [ -z "$run_id" ] ; then
+            echo "::error::No successful Build run for tag $TAG. Wait for it to finish (or fix it), then re-run this workflow."
+            exit 1
+          fi
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
+            --name "flipper-z-f7-$TAG" --dir packages
+          ls -l packages
+          for f in "flipper-z-f7-update-$TAG.tgz" "flipper-z-f7-update-$TAG.zip" "flipper-z-f7-sdk-$TAG.zip" ; do
+            test -f "packages/$f" || { echo "::error::Build artifact is missing $f"; exit 1; }
+          done
 
-      - name: "Update release with assets and notes"
-        uses: "softprops/action-gh-release@v1"
-        env:
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-        with:
-          body_path: .github/workflow_data/release.md
-          files: |
-            flipper-z-f7-update-${{ github.event.release.tag_name }}.tgz
-            flipper-z-f7-update-${{ github.event.release.tag_name }}.zip
-            flipper-z-f7-sdk-${{ github.event.release.tag_name }}.zip
-
-      - name: "Trigger reindex"
+      - name: "Update the release with notes and packages"
         run: |
-          curl --fail -L -H "Token: ${{ secrets.INDEXER_TOKEN }}" \
-              "${{ secrets.INDEXER_URL }}"/firmware/reindex;
-
-      - name: "Force deploy website to refresh releases"
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
-          repository: Next-Flip/v2.momentum-fw.dev
-          event-type: force-deploy
-
-      - name: "Send release notification"
-        env:
-          RELEASE_WEBHOOK: ${{ secrets.RELEASE_WEBHOOK }}
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-        run: python .github/workflow_data/webhook.py
+          set -e
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --notes-file .github/workflow_data/release.md
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            "packages/flipper-z-f7-update-$TAG.tgz" \
+            "packages/flipper-z-f7-update-$TAG.zip" \
+            "packages/flipper-z-f7-sdk-$TAG.zip"
