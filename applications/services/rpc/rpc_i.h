@@ -29,6 +29,16 @@ void rpc_send_and_release_empty(RpcSession* session, uint32_t command_id, PB_Com
 
 void rpc_add_handler(RpcSession* session, pb_size_t message_tag, RpcHandler* handler);
 
+/** Whether this session may use the whole RPC while the PIN lock is on.
+ *
+ * True when the PIN lock is off, or when it is on and the setting for the
+ * session's owner (USB, BLE or an expansion module) allows locked RPC.
+ * A session for which this is false only gets the few commands of
+ * rpc_session_command_allowed_while_locked(): no input, storage, app or
+ * desktop unlock.
+ */
+bool rpc_session_is_allowed_while_locked(RpcSession* session);
+
 void* rpc_system_system_alloc(RpcSession* session);
 void* rpc_system_storage_alloc(RpcSession* session);
 void rpc_system_storage_free(void* ctx);

@@ -104,6 +104,8 @@ typedef struct {
     FuriHalVersionColor spoof_color;
     ScreenFrameColor rpc_color_fg;
     ScreenFrameColor rpc_color_bg;
+    // Kept last so the fields before it stay where external apps expect them
+    bool allow_locked_rpc_expansion;
 } MomentumSettings;
 
 void momentum_settings_save(void);

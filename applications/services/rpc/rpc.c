@@ -98,6 +98,45 @@ RpcOwner rpc_session_get_owner(RpcSession* session) {
     return session->owner;
 }
 
+static bool rpc_owner_is_allowed_while_locked(RpcOwner owner) {
+    switch(owner) {
+    case RpcOwnerUsb:
+        return momentum_settings.allow_locked_rpc_usb;
+    case RpcOwnerBle:
+        return momentum_settings.allow_locked_rpc_ble;
+    case RpcOwnerUart:
+        return momentum_settings.allow_locked_rpc_expansion;
+    default:
+        return false;
+    }
+}
+
+bool rpc_session_is_allowed_while_locked(RpcSession* session) {
+    furi_check(session);
+    if(!furi_hal_rtc_is_flag_set(FuriHalRtcFlagLock)) return true;
+    return rpc_owner_is_allowed_while_locked(session->owner);
+}
+
+/* What a session that isn't allowed while locked can still do: keep the
+ * session alive, ask whether the device is locked, and mirror the screen
+ * (which only shows the lock screen), so that a Video Game Module keeps
+ * showing the Flipper. Nothing here gives input, storage, apps or an unlock.
+ */
+static bool rpc_session_command_allowed_while_locked(pb_size_t which_content) {
+    switch(which_content) {
+    case PB_Main_stop_session_tag:
+    case PB_Main_system_ping_request_tag:
+    case PB_Main_desktop_is_locked_request_tag:
+    case PB_Main_desktop_status_subscribe_request_tag:
+    case PB_Main_desktop_status_unsubscribe_request_tag:
+    case PB_Main_gui_start_screen_stream_request_tag:
+    case PB_Main_gui_stop_screen_stream_request_tag:
+        return true;
+    default:
+        return false;
+    }
+}
+
 static void rpc_close_session_process(const PB_Main* request, void* context) {
     furi_assert(request);
     furi_assert(context);
@@ -279,7 +318,18 @@ static int32_t rpc_session_worker(void* context) {
             RpcHandler* handler =
                 RpcHandlerDict_get(session->handlers, session->decoded_message->which_content);
 
-            if(handler && handler->message_handler) {
+            if(handler && handler->message_handler &&
+               !rpc_session_is_allowed_while_locked(session) &&
+               !rpc_session_command_allowed_while_locked(
+                   session->decoded_message->which_content)) {
+                // PIN lock is on and this session's owner isn't allowed the full RPC
+                FURI_LOG_W(
+                    TAG,
+                    "Message(%d) refused: device is locked",
+                    session->decoded_message->which_content);
+                rpc_send_and_release_empty(
+                    session, session->decoded_message->command_id, PB_CommandStatus_ERROR);
+            } else if(handler && handler->message_handler) {
                 furi_check(furi_mutex_acquire(rpc->busy_mutex, FuriWaitForever) == FuriStatusOk);
                 handler->message_handler(session->decoded_message, handler->context);
                 furi_check(furi_mutex_release(rpc->busy_mutex) == FuriStatusOk);
@@ -389,6 +439,9 @@ RpcSession* rpc_session_open(Rpc* rpc, RpcOwner owner) {
     if(furi_hal_rtc_is_flag_set(FuriHalRtcFlagLock)) {
         if(owner == RpcOwnerUsb && !momentum_settings.allow_locked_rpc_usb) return NULL;
         if(owner == RpcOwnerBle && !momentum_settings.allow_locked_rpc_ble) return NULL;
+        // An expansion module (RpcOwnerUart) still gets a session, but while the
+        // lock is on it only gets the screen mirror unless allow_locked_rpc_expansion
+        // is set: see rpc_session_command_allowed_while_locked()
     }
 
     furi_check(rpc);
