@@ -18,7 +18,7 @@ This setting will unlock whole CC1101 Frequency range specifications, regardless
 
 You can also do this when "Region is not provisioned", but this is discouraged: it is possible that frequency is allowed for you, the error means "I don't know what is allowed or not" because `/int/.region_data` file is missing. Better to update/reinstall firmware. But if this is not possible, Bypass Region works too.
 
-You can enable in `Momentum > Protocols > SubGHz Bypass Region Lock`.
+You can enable in `Flipware > Protocols > SubGHz Bypass Region Lock`.
 
 ## How to extend SubGHz supported frequency range
 
@@ -30,4 +30,4 @@ You can enable in `Momentum > Protocols > SubGHz Bypass Region Lock`.
 3. Extending frequency range and transmitting on frequencies that outside of hardware specs can damage your hardware!
 4. Flipper Devices team and/or Momentum FW developers are not responsible for any damage that can be caused by using CFW or extending frequency ranges!!!
 
-If you really sure you need that change, enable in `Momentum > Protocols > SubGHz Extend Freq Bands`.
+If you really sure you need that change, enable in `Flipware > Protocols > SubGHz Extend Freq Bands`.

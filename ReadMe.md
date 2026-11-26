@@ -21,13 +21,26 @@ say which device this firmware runs on.
 
 ## What Flipware adds
 
-- **Video Game Module desktop.** The VGM can show a full desktop over HDMI: a
-  live mirror of the Flipper screen, a file browser for the SD card and an app
-  dock, driven by keyboard and mouse.
-- **USB display stream.** The same desktop streams out of the VGM's own USB-C
-  port, so a computer can act as its screen and keyboard.
+- **Video Game Module desktop (preview).** The VGM can show a full desktop over
+  HDMI: a live mirror of the Flipper screen, a file browser for the SD card and
+  an app dock, driven by keyboard and mouse.
+- **USB display stream (preview).** The same desktop streams out of the VGM's
+  own USB-C port, so a computer can act as its screen and keyboard.
 - **Coprocessor offload.** The Flipper can hand compute jobs to the VGM's
-  RP2040 over a faster expansion link (DMA receive, 2 Mbaud).
+  RP2040 over the expansion link, with DMA receive on the Flipper side. The
+  module picks the link speed: Flipware's VGM firmware asks for 2,000,000 baud
+  and the stock module for 1,843,200. This is no speed-up for per-byte work such
+  as CRC or hashing; it pays off for jobs with a small payload and a lot of
+  compute.
+
+**About the preview label.** The desktop and the display stream run on
+Flipware's own VGM firmware, [video-game-module](https://github.com/calvingunther66/video-game-module)
+(branch `feature/idea-list`). That firmware is not merged into the project's
+default branch and has no release yet, and there is no computer-side viewer for
+the USB stream. Both features stay in preview until Stage 3 of the
+[roadmap](ROADMAP.md#stage-3-the-video-game-module-platform) ships them in a
+released build. The Flipper-side code for coprocessor offload is in this
+repository; the RP2040 side is part of the same VGM firmware work.
 
 Everything from Momentum is still here: asset packs, the main menu and lock
 screen customisation, Bad KB, the extended Sub-GHz and NFC tools, and the rest
@@ -49,8 +62,10 @@ how to install and build, and how to contribute are in the
 
 ## Install
 
-Releases are published on the
-[releases page](https://github.com/calvingunther66/Flipware/releases).
+There is no Flipware release yet: the
+[releases page](https://github.com/calvingunther66/Flipware/releases) is empty
+until `flpw-001` ships (see the [roadmap](ROADMAP.md)). Until then, build it
+yourself, as described below. Once a release exists, install it like this:
 
 > <details><summary><code>qFlipper package (.tgz)</code></summary><ul>
 >   <li>Download the .tgz from the latest release</li>
@@ -65,6 +80,8 @@ Releases are published on the
 > </ul></details>
 
 ## Build it yourself
+
+This is the way to run Flipware today.
 
 ```bash
 git clone --recursive --jobs 8 https://github.com/calvingunther66/Flipware.git

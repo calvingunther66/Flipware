@@ -14,7 +14,7 @@ Installing Asset Packs is quite easy and straightforward. First, make sure you'r
 
   If you did this correctly, you should see `SD/asset_packs/PackName/Anims` and/or `SD/asset_packs/PackName/Icons`.
 
-- Now simply open the Momentum Settings app (from the home screen press `Arrow UP` and then `Momentum Settings`) and select the asset pack you want. When you back out, Flipper will restart and your animations and icons will use the ones from the selected pack!
+- Now simply open the Flipware app (from the home screen press `Arrow UP` and then `Flipware`) and select the asset pack you want. When you back out, Flipper will restart and your animations and icons will use the ones from the selected pack!
 
 <br>
 
@@ -149,7 +149,7 @@ All the .bm and .bmx struggles are dealt with by the packer system, which is in 
 
 - Now upload the packed packs from that folder onto your flipper in `SD/asset_packs`.
 
-- Done! Just select it from the Momentum Settings app now. And if you're generous share your (packed) asset pack in #asset-packs on discord.
+- Done! Just select it from the Flipware app now. And if you're generous share your (packed) asset pack in #asset-packs on discord.
 
 #### Building with Firmware
 

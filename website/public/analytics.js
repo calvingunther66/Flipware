@@ -7,7 +7,7 @@
  *   anyone change their mind, and the choice is remembered in this browser.
  * - Besides GA's own page views, scrolls, outbound clicks and engagement
  *   time, this sends:
- *     cta_click      {cta}            Download / Source code / nav links
+ *     cta_click      {cta}            Build from source / Source code / nav links
  *     section_view   {section}        a section scrolled at least 40% into view
  *     read_time      {seconds}        visible time on page passed 15/30/60/120/300 s
  *     copy_command   {command}        build command copied
