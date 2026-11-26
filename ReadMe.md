@@ -36,6 +36,11 @@ of its [feature list](https://github.com/Next-Flip/Momentum-Firmware#list-of-cha
 Apps built for Momentum keep working: Flipware keeps Momentum's app API and
 still defines `FW_ORIGIN_Momentum` for apps that check for it.
 
+## Roadmap
+
+What is planned for the next year, stage by stage, is in
+[ROADMAP.md](ROADMAP.md). Each stage has a tracking issue labelled `roadmap`.
+
 ## Install
 
 Releases are published on the
