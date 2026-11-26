@@ -9,8 +9,9 @@
  * connected or the task isn't supported.
  *
  * @warning Read this before reaching for it as a performance tool: the link
- * is a ~1.8 Mbaud stop-and-wait UART, roughly 20-100x slower per byte than
- * running the same work on the Flipper's own CPU for straightforward
+ * is a 1.8-2 Mbaud stop-and-wait UART (1,843,200 baud with the stock module,
+ * 2,000,000 with Flipware's VGM firmware), roughly 20-100x slower per byte
+ * than running the same work on the Flipper's own CPU for straightforward
  * per-byte tasks (CRC, hashing, compression). It only pays off for tasks
  * with a small job/result and a large amount of compute per byte
  * transferred (e.g. keyspace search). CoprocTaskCrc32 in particular is

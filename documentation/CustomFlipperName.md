@@ -1,9 +1,9 @@
 # How to change Flipper name:
 
 ## Instruction
-1. Go to Momentum -> Misc -> Spoofing Options -> Flipper Name
+1. Go to Flipware -> Misc -> Spoofing Options -> Flipper Name
 2. Enter your new custom name for your flipper and click `Save`, **name will be saved on microSD card, and will stay same after firmware updates**
-3. You will need to exit from Momentum app and Flipper will automatically reboot!
+3. You will need to exit from the Flipware app and Flipper will automatically reboot!
 4. After reboot you will see your new custom name in device info and right screen `passport`
 5. Done!
 

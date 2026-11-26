@@ -27,10 +27,10 @@
         <img class="wordmark" src="img/flipware_logo_light.png" alt="Flipware">
       </picture>
       <p class="tagline">Open-source custom firmware for Flipper Zero.</p>
-      <p class="lede">Everything Momentum offers, plus a desktop on the Video Game Module, a USB
-        display stream and compute offload to the RP2040.</p>
+      <p class="lede">Everything Momentum offers, plus compute offload to the Video Game Module's RP2040,
+        and a VGM desktop and USB display stream in preview.</p>
       <div class="cta">
-        <a class="btn primary" href="https://github.com/calvingunther66/Flipware/releases" data-cta="hero_download">Download</a>
+        <a class="btn primary" href="#build" data-cta="hero_build">Build from source</a>
         <a class="btn" href="https://github.com/calvingunther66/Flipware" data-cta="hero_source">Source code</a>
       </div>
       <div class="lcd"><img src="img/slide_0.png" alt="Flipware welcome screen on the Flipper" width="512" height="256"></div>
@@ -40,19 +40,22 @@
       <h2>What Flipware adds</h2>
       <div class="cards">
         <article>
-          <h3>VGM desktop</h3>
+          <h3>VGM desktop <span class="tag">Preview</span></h3>
           <p>The Video Game Module shows a full desktop over HDMI: a live mirror of the Flipper
-            screen, an SD card file browser and an app dock, driven by keyboard and mouse.</p>
+            screen, an SD card file browser and an app dock, driven by keyboard and mouse. It runs
+            on Flipware's <a href="https://github.com/calvingunther66/video-game-module/tree/feature/idea-list">VGM firmware</a>,
+            which is not released yet.</p>
         </article>
         <article>
-          <h3>USB display stream</h3>
+          <h3>USB display stream <span class="tag">Preview</span></h3>
           <p>The same desktop streams out of the VGM's USB-C port, so a computer can be its screen
-            and keyboard.</p>
+            and keyboard. Same preview VGM firmware as above; no computer-side viewer yet.</p>
         </article>
         <article>
           <h3>Coprocessor offload</h3>
-          <p>The Flipper hands compute jobs to the RP2040 over a faster expansion link with DMA
-            receive at 2&nbsp;Mbaud.</p>
+          <p>The Flipper hands compute jobs to the RP2040 over the expansion link, with DMA receive.
+            Flipware's VGM firmware asks for 2,000,000 baud, the stock module for 1,843,200. It
+            helps jobs with a small payload and a lot of compute, not per-byte work like CRC.</p>
         </article>
         <article>
           <h3>All of Momentum</h3>
@@ -68,6 +71,8 @@
 
     <section id="install">
       <h2>Install</h2>
+      <p class="note">There is no release yet; the first one will be <code>flpw-001</code>. Until then,
+        <a href="#build" data-cta="install_build">build it yourself</a>. Once a release is out:</p>
       <ol class="steps">
         <li>Download the <code>.tgz</code> package from the
           <a href="https://github.com/calvingunther66/Flipware/releases" data-cta="install_release">latest release</a>.</li>
