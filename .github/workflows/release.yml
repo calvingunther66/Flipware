@@ -1,18 +1,25 @@
 name: "Release"
 
-# Publishing a GitHub release attaches the update package and SDK that the Build
-# workflow already produced for the release's tag, and fills in the release notes
-# from CHANGELOG.md. Nothing is downloaded from or sent to any outside server.
+# Pushing a release tag publishes the GitHub release, with no manual steps.
+# Build calls this workflow for tags named flpw-NNN (final) and flpw-NNN-rcN
+# (release candidate, published as a pre-release), after its own build job has
+# finished and uploaded the packages for the tag.
 #
-# Order of events for a release (see CHANGELOG.md and CONTRIBUTING.md):
+# What to do for a release (see CONTRIBUTING.md):
 #   1. rename "## Unreleased" in CHANGELOG.md to "## <tag> - <date>" and merge it
-#   2. push the tag; Build runs on it and uploads the packages as an artifact
-#   3. publish the release for that tag; this workflow does the rest
+#      (a -rc tag may be cut before that: it falls back to "## Unreleased")
+#   2. push the tag
+#   3. wait: this workflow creates the release, with the notes from CHANGELOG.md
+#      and these files: the update .tgz (qFlipper), the update .zip, the full
+#      .dfu, the SDK .zip and SHA256SUMS
+#
+# If the release job fails (for example the changelog section is missing), fix
+# the cause and re-run the failed job on the tag's Build run: it is safe to run
+# again and replaces files that are already on the release. Nothing is
+# downloaded from or sent to any outside server.
 
 on:
-  release:
-    types:
-      - released
+  workflow_call:
 
 permissions:
   contents: read
@@ -20,45 +27,71 @@ permissions:
 jobs:
   release:
     permissions:
-      contents: write # edit the release and upload its files
-      actions: read # find and download the tag's Build artifact
+      contents: write # create the release and upload its files
+      actions: read # download the packages Build uploaded in this run
     runs-on: ubuntu-latest
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      TAG: ${{ github.event.release.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
     steps:
       - name: "Checkout code"
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 1
 
-      - name: "Write release notes"
-        run: python .github/workflow_data/release.py
-
-      - name: "Download packages from the tag's Build run"
+      - name: "Check the tag name"
         run: |
-          set -e
-          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml \
-            --branch "$TAG" --status success --limit 1 \
-            --json databaseId --jq '.[0].databaseId')
-          if [ -z "$run_id" ] ; then
-            echo "::error::No successful Build run for tag $TAG. Wait for it to finish (or fix it), then re-run this workflow."
+          if ! python3 .github/workflow_data/release.py check-tag "$TAG" ; then
+            echo "::error::Release tags look like flpw-001 or flpw-001-rc1, not '$TAG'."
             exit 1
           fi
-          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
-            --name "flipper-z-f7-$TAG" --dir packages
-          ls -l packages
-          for f in "flipper-z-f7-update-$TAG.tgz" "flipper-z-f7-update-$TAG.zip" "flipper-z-f7-sdk-$TAG.zip" ; do
-            test -f "packages/$f" || { echo "::error::Build artifact is missing $f"; exit 1; }
-          done
 
-      - name: "Update the release with notes and packages"
+      - name: "Write release notes"
+        run: |
+          python3 .github/workflow_data/release.py notes --tag "$TAG" \
+            --changelog CHANGELOG.md \
+            --template .github/workflow_data/release.md \
+            --out release-notes.md
+
+      - name: "Download packages from this run"
         run: |
           set -e
-          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" \
-            --notes-file .github/workflow_data/release.md
-          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            "packages/flipper-z-f7-update-$TAG.tgz" \
-            "packages/flipper-z-f7-update-$TAG.zip" \
-            "packages/flipper-z-f7-sdk-$TAG.zip"
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "flipper-z-f7-$TAG" --dir packages
+          # Gather the files in one flat folder, whatever folders the artifact kept.
+          mkdir release-files
+          for f in "flipper-z-f7-update-$TAG.tgz" "flipper-z-f7-update-$TAG.zip" \
+                   "flipper-z-f7-full-$TAG.dfu" "flipper-z-f7-sdk-$TAG.zip" ; do
+            found=$(find packages -type f -name "$f" | head -n1)
+            if [ -z "$found" ] ; then
+              echo "::error::The Build artifact for $TAG is missing $f"
+              find packages -type f
+              exit 1
+            fi
+            cp "$found" release-files/
+          done
+          python3 .github/workflow_data/release.py sums --out release-files/SHA256SUMS release-files/flipper-z-f7-*
+          cat release-files/SHA256SUMS
+
+      - name: "Publish the release"
+        run: |
+          set -e
+          prerelease_flag=--prerelease=false
+          if [ "$(python3 .github/workflow_data/release.py is-prerelease "$TAG")" = true ] ; then
+            prerelease_flag=--prerelease
+          fi
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 ; then
+            # Already there (a re-run, or someone made it by hand): bring it up to date.
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --notes-file release-notes.md "$prerelease_flag"
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber release-files/*
+          else
+            # Create it as a draft, add every file, then publish, so nobody
+            # sees a release with files missing.
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --draft --title "$TAG" --notes-file release-notes.md "$prerelease_flag"
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber release-files/*
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,assets \
+            --jq '"\(.url) prerelease=\(.isPrerelease) files=\([.assets[].name] | join(", "))"'

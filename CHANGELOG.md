@@ -14,7 +14,17 @@ Removed, with the PR number. Write it for someone who uses the firmware. Credit
 the original author when the change is a port, for example
 `UL: Add Doorbell32 protocol (by @author)`.
 
-**Releasing:** when a tag such as `flpw-001` is cut, rename `## Unreleased` to
+**Releasing:** rename `## Unreleased` to `## flpw-001 - YYYY-MM-DD` (use the
+tag you are about to push), add a new empty `## Unreleased` above it, merge that,
+then push the tag. Building the tag publishes the GitHub release by itself: the
+update `.tgz` and `.zip`, the full `.dfu`, the SDK zip and `SHA256SUMS`, with this
+section as the notes (`.github/workflows/release.yml`,
+`.github/workflow_data/release.py`). A tag ending in `-rcN`, for example
+`flpw-001-rc1`, is published as a pre-release and may be cut before the rename: it
+uses its own section, then the final tag's section, then `## Unreleased`. A final
+tag with no section of its own fails the release job.
+
+## Unreleased` to
 `## flpw-001 - YYYY-MM-DD` and add a new empty `## Unreleased` above it. The
 release workflow publishes only the section whose heading starts with the tag
 being released (`.github/workflow_data/release.py`), and fails if there is none.
@@ -43,6 +53,7 @@ No release has been tagged yet, so everything since the fork is here.
 - Project: `ROADMAP.md` (#24), `CONTRIBUTING.md`, `SECURITY.md`, `CODEOWNERS` (#87), a project wiki linked from the ReadMe (#83), and this changelog (#36)
 
 ### Updated
+- Releases: pushing a `flpw-NNN` tag publishes the GitHub release by itself, with the update `.tgz` and `.zip`, the full `.dfu`, the SDK zip, `SHA256SUMS` and the changelog section as notes; `-rcN` tags are pre-releases (#PR)
 - Boot screen and updater screen say Flipware instead of Momentum (#20)
 - Passport screen says FLPW·ID instead of MNTM·ID (#86)
 - ReadMe, website and docs say what the code does: the VGM desktop and USB display stream are labelled preview, there is no release yet, and menu paths say Flipware (#86)

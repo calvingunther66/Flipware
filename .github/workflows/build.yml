@@ -2,6 +2,7 @@ name: "Build"
 
 # Pushes to dev and tags build here; every other branch builds through its
 # pull request, so a PR commit is compiled once instead of twice.
+# A tag named flpw-* also publishes a release once the build is done (release.yml).
 on:
   push:
     branches:
@@ -99,6 +100,18 @@ jobs:
         run: |
           git diff --exit-code
 
+      # The update folder, zipped, for people who copy it to the SD card by hand.
+      # (fbt itself only makes the .tgz for qFlipper.)
+      - name: "Zip the update folder"
+        run: |
+          set -e
+          update_dir=$(ls -d dist/${TARGET}-*/${TARGET}-update-*/ | head -n1)
+          python3 - "$update_dir" "$(dirname "$update_dir")/flipper-z-${TARGET}-update-${SUFFIX}" <<'PY'
+          import shutil, sys
+          shutil.make_archive(sys.argv[2], "zip", root_dir=sys.argv[1])
+          PY
+          ls -l dist/${TARGET}-*/flipper-z-${TARGET}-update-*
+
       - name: "Upload artifacts to GitHub"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -106,6 +119,7 @@ jobs:
           path: |
             dist/${{ env.TARGET }}-*/flipper-z-${{ env.TARGET }}-update-*
             dist/${{ env.TARGET }}-*/flipper-z-${{ env.TARGET }}-sdk-*
+            dist/${{ env.TARGET }}-*/flipper-z-${{ env.TARGET }}-full-*.dfu
 
       # Replaces the old PR comment, which needed Momentum's update server.
       - name: "Write build summary"
@@ -126,3 +140,11 @@ jobs:
             rm -rf summary-tmp
           fi
           echo "- Update package and SDK: artifact \`flipper-z-${TARGET}-${SUFFIX}\` on this run" >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/flpw-')
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/release.yml

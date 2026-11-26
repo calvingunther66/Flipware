@@ -32,6 +32,26 @@ After performing operations on flash memory, the system restarts into newly flas
 
 If the update package contains an additional resources archive, it is extracted onto the SD card.
 
+## First boot flag
+
+When an update installs a new splash screen, the updater looks for the file `/int/.momentum_firstboot.flag`. If it is missing, this is the first boot of a Momentum-family firmware: the updater creates the flag and shows the one-time `firstboot.bin` slideshow instead of the normal one. Older firmware kept the flag as `/ext/.config/firstboot.flag` or `/ext/.config/momentum_firstboot.flag`; the updater moves those to `/int` once.
+
+Flipware keeps the name `.momentum_firstboot.flag` on purpose. Someone who updates from Momentum to Flipware already has the file, so renaming it would only make them see the first-boot slideshow a second time, and the name does not appear anywhere users look. It is a compatibility path, not a claim that the firmware is Momentum.
+
+## Flipware release packages
+
+Pushing a tag `flpw-NNN` publishes a GitHub release with these files (tags `flpw-NNN-rcN` are published as pre-releases):
+
+| File | What it is |
+| ---- | ---------- |
+| `flipper-z-f7-update-<tag>.tgz` | The update package for qFlipper. |
+| `flipper-z-f7-update-<tag>.zip` | The same update folder, zipped, to unpack onto the SD card by hand and start from the Flipper's Archive or Updater app. |
+| `flipper-z-f7-full-<tag>.dfu` | The whole firmware as one DFU image, for flashing in DFU mode (recovery). It does not update the radio stack. |
+| `flipper-z-f7-sdk-<tag>.zip` | The SDK for building apps against that release. |
+| `SHA256SUMS` | Checksums of the four files above. |
+
+Check a download with `sha256sum --check --ignore-missing SHA256SUMS`. The release notes are the tag's section of `CHANGELOG.md`. How the pipeline works: `.github/workflows/build.yml` builds the tag, `.github/workflows/release.yml` creates the release, and `.github/workflow_data/release.py` writes the notes and the checksums.
+
 ## Update manifest
 
 An update package comes with a manifest that contains a description of its contents. The manifest is in Flipper File Format — a simple text file, comprised of key-value pairs.
