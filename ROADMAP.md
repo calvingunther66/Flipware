@@ -8,8 +8,11 @@ a measured build of `dev` at `b6bf392`.
 
 It is split into eight stages. Each stage ends in a release, has a goal and
 exit criteria, and is broken into epics. Every stage has a tracking issue on
-GitHub labelled `roadmap`, and every epic is a sub-issue of it, so work can be
-picked up one issue (and one branch) at a time. Dates are targets, not
+GitHub labelled `roadmap` and a matching
+[milestone](https://github.com/calvingunther66/Flipware/milestones?direction=asc&sort=due_date),
+and every epic is a sub-issue of its stage, so work can be picked up one issue
+(and one branch) at a time. The maintainer's "Flipware Roadmap" GitHub
+Project shows the same issues as a timeline, grouped by stage. Dates are targets, not
 promises: a stage ends when its exit criteria are met.
 
 - [Where Flipware stands today](#where-flipware-stands-today)
