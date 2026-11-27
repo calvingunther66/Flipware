@@ -132,9 +132,8 @@ void furi_hal_gpio_init_ex(
         // left on (rise and fall, for a signal reader) stayed on when it was set to rise only.
         const bool rising = mode == GpioModeInterruptRise || mode == GpioModeInterruptRiseFall ||
                             mode == GpioModeEventRise || mode == GpioModeEventRiseFall;
-        const bool falling = mode == GpioModeInterruptFall ||
-                             mode == GpioModeInterruptRiseFall || mode == GpioModeEventFall ||
-                             mode == GpioModeEventRiseFall;
+        const bool falling = mode == GpioModeInterruptFall || mode == GpioModeInterruptRiseFall ||
+                             mode == GpioModeEventFall || mode == GpioModeEventRiseFall;
         if(rising) {
             LL_EXTI_EnableRisingTrig_0_31(exti_line);
         } else {

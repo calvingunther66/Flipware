@@ -546,7 +546,9 @@ static MfDesfireError mf_desfire_poller_read_records(
 
         uint8_t* file_data = simple_array_get_data(data->data);
         bit_buffer_write_bytes(
-            instance->result_buffer, &file_data[(size_t)records_read * record_size], bytes_to_read);
+            instance->result_buffer,
+            &file_data[(size_t)records_read * record_size],
+            bytes_to_read);
         records_read += records_to_read;
     }
 

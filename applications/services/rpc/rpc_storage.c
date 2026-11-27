@@ -688,10 +688,10 @@ static void rpc_system_storage_backup_create_process(const PB_Main* request, voi
 
     rpc_system_storage_reset_state(rpc_storage, session, true);
 
-    bool backup_ok = request->content.storage_backup_create_request.archive_path &&
-                     int_backup_create(
-                         rpc_storage->api,
-                         request->content.storage_backup_create_request.archive_path);
+    bool backup_ok =
+        request->content.storage_backup_create_request.archive_path &&
+        int_backup_create(
+            rpc_storage->api, request->content.storage_backup_create_request.archive_path);
 
     rpc_send_and_release_empty(
         session, request->command_id, backup_ok ? PB_CommandStatus_OK : PB_CommandStatus_ERROR);
@@ -710,10 +710,10 @@ static void rpc_system_storage_backup_restore_process(const PB_Main* request, vo
 
     rpc_system_storage_reset_state(rpc_storage, session, true);
 
-    bool backup_ok = request->content.storage_backup_restore_request.archive_path &&
-                     int_backup_unpack(
-                         rpc_storage->api,
-                         request->content.storage_backup_restore_request.archive_path);
+    bool backup_ok =
+        request->content.storage_backup_restore_request.archive_path &&
+        int_backup_unpack(
+            rpc_storage->api, request->content.storage_backup_restore_request.archive_path);
 
     rpc_send_and_release_empty(
         session, request->command_id, backup_ok ? PB_CommandStatus_OK : PB_CommandStatus_ERROR);
