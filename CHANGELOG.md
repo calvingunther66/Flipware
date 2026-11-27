@@ -27,6 +27,7 @@ tag with no section of its own fails the release job.
 ## Unreleased
 
 ### Updated
+- CI: every Build now boots the firmware in the FlipperEmu emulator and runs its checks: boot and radios, an update install, the VGM coprocessor, BLE pairing, the serial ports and the PIN lock. A pull request that breaks one of them turns red, with the device's logs and screenshots attached (#PR)
 - Releases: pushing a `flpw-NNN` tag publishes the GitHub release by itself, with the update `.tgz` and `.zip`, the full `.dfu`, the SDK zip, `SHA256SUMS` and the changelog section as notes; `-rcN` tags are pre-releases (#94)
 
 ## flpw-001 - 2026-11-26
