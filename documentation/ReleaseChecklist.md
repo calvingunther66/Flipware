@@ -11,7 +11,7 @@ issue, or skipped with the reason.
 ## 1. Freeze
 
 - All pull requests meant for the release are merged and `dev` is green
-  (Build and Lint, plus the host tests and emulator checks once they are on `dev`).
+  (Build with its emulator checks, Lint, and the host tests).
 - `CHANGELOG.md` has every change under `## Unreleased`.
 
 ## 2. Release candidate
