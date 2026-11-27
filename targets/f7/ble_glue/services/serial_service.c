@@ -148,8 +148,11 @@ typedef enum {
 
 static void
     ble_svc_serial_update_rpc_char(BleServiceSerial* serial_svc, SerialServiceRpcStatus status) {
+    // The characteristic is four bytes long: give it a four-byte value, not the address of an
+    // enum that may be one byte.
+    uint32_t value = status;
     ble_gatt_characteristic_update(
-        serial_svc->svc_handle, &serial_svc->chars[SerialSvcGattCharacteristicStatus], &status);
+        serial_svc->svc_handle, &serial_svc->chars[SerialSvcGattCharacteristicStatus], &value);
 }
 
 BleServiceSerial* ble_svc_serial_start(void) {

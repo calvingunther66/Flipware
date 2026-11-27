@@ -26,7 +26,9 @@ static void desktop_view_slideshow_draw(Canvas* canvas, void* model) {
     DesktopSlideshowViewModel* m = model;
 
     canvas_clear(canvas);
-    if(slideshow_is_loaded(m->slideshow)) {
+    // The view is current before its enter callback has made the slideshow (and after its exit
+    // callback has freed it), and a redraw in between finds none.
+    if(m->slideshow && slideshow_is_loaded(m->slideshow)) {
         slideshow_draw(m->slideshow, canvas, 0, 0);
     }
 }
@@ -36,6 +38,10 @@ static bool desktop_view_slideshow_input(InputEvent* event, void* context) {
     DesktopSlideshowView* instance = context;
 
     DesktopSlideshowViewModel* model = view_get_model(instance->view);
+    if(!model->slideshow) {
+        view_commit_model(instance->view, false);
+        return true;
+    }
     bool update_view = false;
     if(model->slideshow->icon.frame_count == 7) {
         if(event->type == InputTypeShort) {
@@ -114,6 +120,10 @@ static void desktop_first_start_timer_callback(void* context) {
 static void desktop_first_start_auto_timer_callback(void* context) {
     DesktopSlideshowView* instance = context;
     DesktopSlideshowViewModel* model = view_get_model(instance->view);
+    if(!model->slideshow) {
+        view_commit_model(instance->view, false);
+        return;
+    }
     if(model->slideshow->current_frame < 5 && model->slideshow->current_frame > 1) {
         slideshow_advance(model->slideshow);
     } else {
@@ -155,6 +165,7 @@ static void desktop_view_slideshow_exit(void* context) {
 
     DesktopSlideshowViewModel* model = view_get_model(instance->view);
     slideshow_free(model->slideshow);
+    model->slideshow = NULL;
     view_commit_model(instance->view, false);
 }
 

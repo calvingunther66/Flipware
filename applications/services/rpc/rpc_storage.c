@@ -115,6 +115,13 @@ static void rpc_system_storage_info_process(const PB_Main* request, void* contex
 
     rpc_system_storage_reset_state(rpc_storage, session, true);
 
+    // A request with no path has a NULL one: refuse it instead of passing it on.
+    if(!request->content.storage_info_request.path) {
+        rpc_send_and_release_empty(
+            session, request->command_id, PB_CommandStatus_ERROR_INVALID_PARAMETERS);
+        return;
+    }
+
     PB_Main* response = malloc(sizeof(PB_Main));
     response->command_id = request->command_id;
 
@@ -148,6 +155,12 @@ static void rpc_system_storage_timestamp_process(const PB_Main* request, void* c
 
     rpc_system_storage_reset_state(rpc_storage, session, true);
 
+    if(!request->content.storage_timestamp_request.path) {
+        rpc_send_and_release_empty(
+            session, request->command_id, PB_CommandStatus_ERROR_INVALID_PARAMETERS);
+        return;
+    }
+
     PB_Main* response = malloc(sizeof(PB_Main));
     response->command_id = request->command_id;
 
@@ -179,6 +192,12 @@ static void rpc_system_storage_stat_process(const PB_Main* request, void* contex
     furi_assert(session);
 
     rpc_system_storage_reset_state(rpc_storage, session, true);
+
+    if(!request->content.storage_stat_request.path) {
+        rpc_send_and_release_empty(
+            session, request->command_id, PB_CommandStatus_ERROR_INVALID_PARAMETERS);
+        return;
+    }
 
     PB_Main* response = malloc(sizeof(PB_Main));
     response->command_id = request->command_id;
@@ -263,6 +282,13 @@ static void rpc_system_storage_list_process(const PB_Main* request, void* contex
     const PB_Storage_ListRequest* list_request = &request->content.storage_list_request;
 
     rpc_system_storage_reset_state(rpc_storage, session, true);
+
+    // A list request with no path has a NULL one, and strcmp() below would fault on it.
+    if(!list_request->path) {
+        rpc_send_and_release_empty(
+            session, request->command_id, PB_CommandStatus_ERROR_INVALID_PARAMETERS);
+        return;
+    }
 
     if(!strcmp(list_request->path, "/")) {
         rpc_system_storage_list_root(request, context);
@@ -353,6 +379,12 @@ static void rpc_system_storage_read_process(const PB_Main* request, void* contex
     furi_assert(session);
 
     rpc_system_storage_reset_state(rpc_storage, session, true);
+
+    if(!request->content.storage_read_request.path) {
+        rpc_send_and_release_empty(
+            session, request->command_id, PB_CommandStatus_ERROR_INVALID_PARAMETERS);
+        return;
+    }
 
     /* use same message memory to send response */
     PB_Main* response = malloc(sizeof(PB_Main));
@@ -628,7 +660,9 @@ static void rpc_system_storage_rename_process(const PB_Main* request, void* cont
     PB_CommandStatus status;
     rpc_system_storage_reset_state(rpc_storage, session, true);
 
-    if(path_contains_only_ascii(request->content.storage_rename_request.new_path)) {
+    if(!request->content.storage_rename_request.old_path) {
+        status = PB_CommandStatus_ERROR_INVALID_PARAMETERS;
+    } else if(path_contains_only_ascii(request->content.storage_rename_request.new_path)) {
         FS_Error error = storage_common_rename(
             rpc_storage->api,
             request->content.storage_rename_request.old_path,
@@ -654,8 +688,10 @@ static void rpc_system_storage_backup_create_process(const PB_Main* request, voi
 
     rpc_system_storage_reset_state(rpc_storage, session, true);
 
-    bool backup_ok = int_backup_create(
-        rpc_storage->api, request->content.storage_backup_create_request.archive_path);
+    bool backup_ok =
+        request->content.storage_backup_create_request.archive_path &&
+        int_backup_create(
+            rpc_storage->api, request->content.storage_backup_create_request.archive_path);
 
     rpc_send_and_release_empty(
         session, request->command_id, backup_ok ? PB_CommandStatus_OK : PB_CommandStatus_ERROR);
@@ -674,8 +710,10 @@ static void rpc_system_storage_backup_restore_process(const PB_Main* request, vo
 
     rpc_system_storage_reset_state(rpc_storage, session, true);
 
-    bool backup_ok = int_backup_unpack(
-        rpc_storage->api, request->content.storage_backup_restore_request.archive_path);
+    bool backup_ok =
+        request->content.storage_backup_restore_request.archive_path &&
+        int_backup_unpack(
+            rpc_storage->api, request->content.storage_backup_restore_request.archive_path);
 
     rpc_send_and_release_empty(
         session, request->command_id, backup_ok ? PB_CommandStatus_OK : PB_CommandStatus_ERROR);
@@ -700,6 +738,11 @@ static void rpc_system_storage_tar_extract_process(const PB_Main* request, void*
     do {
         const char *tar_path = request->content.storage_tar_extract_request.tar_path,
                    *out_path = request->content.storage_tar_extract_request.out_path;
+        if(!tar_path) {
+            status = PB_CommandStatus_ERROR_INVALID_PARAMETERS;
+            break;
+        }
+
         if(!path_contains_only_ascii(out_path)) {
             status = PB_CommandStatus_ERROR_STORAGE_INVALID_NAME;
             break;
