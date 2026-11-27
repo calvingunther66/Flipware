@@ -27,9 +27,11 @@ tag with no section of its own fails the release job.
 ## Unreleased
 
 ### Added
+- Install guide (`documentation/Install.md`): qFlipper, SD card, moving over from Momentum and from the official firmware, what an update changes, recovery; and `documentation/ReleaseChecklist.md`, the release candidate and device pass every release goes through (#44)
 - Build: host tests for the host sign-in code, the 125 kHz RFID Add Manually formats, Sub-GHz capture compare and release notes now run in CI on every pull request, and locally with `./fbt test_host` (#40)
 
 ### Updated
+- Website: a Download button for the latest release and a link to the install guide (#44)
 - Docs: step-by-step hardware test runbook for host sign-in, `documentation/HostAuthHardwareTest.md` (#99)
 - CI: every Build now boots the firmware in the FlipperEmu emulator and runs its checks: boot and radios, an update install, the VGM coprocessor, BLE pairing, the serial ports, the PIN lock and regression checks for the firmware bugs fixed here (FW-01, FW-02, FW-06). A pull request that breaks one of them turns red, with the device's logs and screenshots attached (#97)
 - CI: every Build writes a flash and RAM report (image size, free flash below the radio stack, `.data` and `.bss`, change against `dev`, symbols that grew most) as a job summary and a pull request comment, and fails when free flash drops below the budget or a PR grows the image by more than 512 bytes without the `flash-budget` label (#96)
