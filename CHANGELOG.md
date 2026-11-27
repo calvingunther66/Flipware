@@ -24,12 +24,10 @@ section as the notes (`.github/workflows/release.yml`,
 uses its own section, then the final tag's section, then `## Unreleased`. A final
 tag with no section of its own fails the release job.
 
-## Unreleased` to
-`## flpw-001 - YYYY-MM-DD` and add a new empty `## Unreleased` above it. The
-release workflow publishes only the section whose heading starts with the tag
-being released (`.github/workflow_data/release.py`), and fails if there is none.
-
 ## Unreleased
+
+### Updated
+- Releases: pushing a `flpw-NNN` tag publishes the GitHub release by itself, with the update `.tgz` and `.zip`, the full `.dfu`, the SDK zip, `SHA256SUMS` and the changelog section as notes; `-rcN` tags are pre-releases (#94)
 
 ## flpw-001 - 2026-11-26
 
@@ -55,7 +53,6 @@ The first Flipware release: everything since the fork from Momentum.
 - Project: `ROADMAP.md` (#24), `CONTRIBUTING.md`, `SECURITY.md`, `CODEOWNERS` (#87), a project wiki linked from the ReadMe (#83), and this changelog (#36)
 
 ### Updated
-- Releases: pushing a `flpw-NNN` tag publishes the GitHub release by itself, with the update `.tgz` and `.zip`, the full `.dfu`, the SDK zip, `SHA256SUMS` and the changelog section as notes; `-rcN` tags are pre-releases (#94)
 - Boot screen and updater screen say Flipware instead of Momentum (#20)
 - Passport screen says FLPW·ID instead of MNTM·ID (#86)
 - ReadMe, website and docs say what the code does: the VGM desktop and USB display stream are labelled preview, and menu paths say Flipware (#86)
