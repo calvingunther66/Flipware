@@ -62,10 +62,9 @@ how to install and build, and how to contribute are in the
 
 ## Install
 
-There is no Flipware release yet: the
-[releases page](https://github.com/calvingunther66/Flipware/releases) is empty
-until `flpw-001` ships (see the [roadmap](ROADMAP.md)). Until then, build it
-yourself, as described below. Once a release exists, install it like this:
+Download the latest release from the
+[releases page](https://github.com/calvingunther66/Flipware/releases/latest)
+and install it like this:
 
 > <details><summary><code>qFlipper package (.tgz)</code></summary><ul>
 >   <li>Download the .tgz from the latest release</li>
@@ -80,8 +79,6 @@ yourself, as described below. Once a release exists, install it like this:
 > </ul></details>
 
 ## Build it yourself
-
-This is the way to run Flipware today.
 
 ```bash
 git clone --recursive --jobs 8 https://github.com/calvingunther66/Flipware.git

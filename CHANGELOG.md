@@ -21,7 +21,9 @@ being released (`.github/workflow_data/release.py`), and fails if there is none.
 
 ## Unreleased
 
-No release has been tagged yet, so everything since the fork is here.
+## flpw-001 - 2026-11-26
+
+The first Flipware release: everything since the fork from Momentum.
 
 ### Added
 - Video Game Module (VGM):
@@ -45,7 +47,7 @@ No release has been tagged yet, so everything since the fork is here.
 ### Updated
 - Boot screen and updater screen say Flipware instead of Momentum (#20)
 - Passport screen says FLPW·ID instead of MNTM·ID (#86)
-- ReadMe, website and docs say what the code does: the VGM desktop and USB display stream are labelled preview, there is no release yet, and menu paths say Flipware (#86)
+- ReadMe, website and docs say what the code does: the VGM desktop and USB display stream are labelled preview, and menu paths say Flipware (#86)
 - Performance: faster SD access, app folders load in about half the time (171-app Games folder: 0.75 s to 0.32 s), fewer UI freezes, and lower peak RAM when loading large apps (#12)
 - NFC: the extra screens of each protocol (MIFARE Classic dictionary attack, Ultralight C unlock, SLIX unlock, FeliCa, DESFire and EMV more-info and others) load only while that protocol is in use, shrinking the NFC app's code by about 48% (RogueMaster PR 1073, by Mykhailo Shevchuk) (#23)
 - Build: official-firmware API version mismatch is a warning, not a failure (#15); each PR commit runs one Build and one Lint, Build writes the DFU size and free flash to the job summary, and the toolchain is cached (#84)
