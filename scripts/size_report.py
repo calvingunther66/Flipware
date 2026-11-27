@@ -251,7 +251,8 @@ def check_gates(current, delta, budget, growth_allowed):
         problems.append(
             f"Free flash is {current['free_flash']} B, below the minimum of {minimum} B "
             f"(`min_free_flash_bytes` in the size budget). Make the firmware smaller, or "
-            f"move code to an app on the SD card."
+            f"move code to an app on the SD card. The `{budget.get('label', 'flash-budget')}` "
+            f"label does not lift this minimum."
         )
     max_growth = budget.get("max_growth_bytes")
     if delta is not None and max_growth is not None and not growth_allowed:
@@ -310,7 +311,10 @@ def render_markdown(current, delta, problems, baseline_note, budget):
     out.append("")
     minimum = budget.get("min_free_flash_bytes")
     if minimum is not None:
-        out.append(f"Gate: free flash must stay at or above {minimum:,} B.")
+        out.append(
+            f"Gate: free flash must stay at or above {minimum:,} B "
+            f"(the `{budget.get('label', 'flash-budget')}` label does not lift this)."
+        )
     if budget.get("max_growth_bytes") is not None:
         out.append(
             f"Gate: a PR may grow the image by at most {budget['max_growth_bytes']} B "

@@ -64,7 +64,11 @@ Every pull request should have:
    [.github/size_budget.json](.github/size_budget.json): free flash may not drop
    below the minimum there (it goes up as Stage 2 frees space), and a pull request
    may not grow the image by more than 512 bytes unless the maintainer has put the
-   `flash-budget` label on it (then re-run the Build job). The script is
+   `flash-budget` label on it (then re-run the Build job). The label lifts only
+   that growth limit, not the free-flash minimum: while free flash sits at the
+   minimum (it does today), any growth fails even with the label, so free space
+   elsewhere first. A pull request is checked against the limits of the branch
+   it targets, so changing `size_budget.json` takes effect once it is merged. The script is
    `scripts/size_report.py`; its test is `tests/host/size_report/run.sh`.
 4. **A test or an emulator check.** Add a unit or host test where the code can
    be tested. For anything the emulator can show, run it in

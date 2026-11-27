@@ -156,10 +156,15 @@ jobs:
             echo "No comparison for this kind of build."
             exit 0
           fi
+          # The build of an exact commit is used whatever its result: a dev build
+          # that failed a gate still uploaded its report, and skipping it would
+          # charge dev's own growth to the next PR. Only the "latest dev build"
+          # fallback is limited to successful runs.
           find_run() {
             gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml --branch dev \
-              --event push --status success --limit 1 "$@" --json databaseId --jq '.[0].databaseId // empty'
+              --event push --limit 1 "$@" --json databaseId --jq '.[0].databaseId // empty'
           }
+          find_latest_run() { find_run --status success; }
           run_id=""
           note=""
           if [ -n "$base_sha" ] ; then
@@ -167,7 +172,7 @@ jobs:
             note="dev build ${base_sha:0:8}"
           fi
           if [ -z "$run_id" ] ; then
-            run_id=$(find_run) || true
+            run_id=$(find_latest_run) || true
             note="latest dev build"
           fi
           if [ -z "$run_id" ] ; then
@@ -179,7 +184,7 @@ jobs:
             exit 0
           fi
           echo "That build has no size report (older than this feature, or expired). Trying the latest dev build."
-          latest_id=$(find_run) || true
+          latest_id=$(find_latest_run) || true
           if [ -n "$latest_id" ] && [ "$latest_id" != "$run_id" ] \
               && gh run download "$latest_id" --repo "$GITHUB_REPOSITORY" --name "size-report-$TARGET" --dir size-baseline ; then
             echo "note=latest dev build (run $latest_id)" >> "$GITHUB_OUTPUT"
@@ -194,8 +199,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           BASELINE_NOTE: ${{ steps.baseline.outputs.note }}
         run: |
+          # A pull request is held to the limits of the branch it targets, not
+          # the ones in its own tree, so it can't loosen its own gate. Changing
+          # .github/size_budget.json takes effect once it is merged. (Before the
+          # base branch has the file, the PR's own copy is used.)
+          budget=.github/size_budget.json
+          if [ -n "$PR_NUMBER" ] ; then
+            git fetch --no-tags --depth 1 origin "$BASE_REF"
+            if git show "FETCH_HEAD:$budget" > size_budget.base.json 2>/dev/null ; then
+              if ! cmp -s size_budget.base.json "$budget" ; then
+                echo "::notice::This PR changes $budget; it is checked against the limits of $BASE_REF."
+              fi
+              budget=size_budget.base.json
+            fi
+          fi
           # The growth limit is for pull requests. After a merge (push to dev) and
           # on tags it is skipped, so a PR that was allowed to grow by the
           # flash-budget label doesn't turn dev red; the free-flash minimum still applies.
@@ -210,7 +230,7 @@ jobs:
           update_dir=$(ls -d dist/${TARGET}-*/${TARGET}-update-*/ | head -n1)
           status=0
           python3 scripts/size_report.py --elf "$elf" --update-dir "$update_dir" \
-            --budget .github/size_budget.json --target "$TARGET" $growth \
+            --budget "$budget" --target "$TARGET" $growth \
             --baseline "size-baseline/size-$TARGET.json" \
             --baseline-note "${BASELINE_NOTE:-nothing (no earlier build to compare with)}" \
             --out-json "size-$TARGET.json" --out-md "size-report.md" || status=$?
