@@ -1,0 +1,47 @@
+name: "Host tests"
+
+# The tests under tests/host build firmware parsers and protocol code with the
+# host compiler and run them under AddressSanitizer and UndefinedBehaviorSanitizer.
+# No firmware build, no toolchain, no device. Same triggers as Build and Lint.
+on:
+  push:
+    branches:
+      - dev
+    tags:
+      - "*"
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # Only the submodules the tests compile: mbedtls for host sign-in, mlib for the
+      # furi string and container headers.
+      - name: "Check out submodules"
+        run: git submodule update --init --depth 1 lib/mbedtls lib/mlib
+
+      # fido2 lets the host sign-in test cross-check its client data JSON against
+      # the library the Windows and Linux clients use.
+      - name: "Install Python packages"
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet cryptography fido2
+
+      - name: "Run host tests"
+        env:
+          PYTHON: ${{ runner.temp }}/venv/bin/python
+        run: tests/host/run.sh

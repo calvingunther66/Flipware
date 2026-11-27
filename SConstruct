@@ -415,6 +415,18 @@ distenv.PhonyTarget(
     IMG_LINT_SOURCES=firmware_env["IMG_LINT_SOURCES"],
 )
 
+# Host tests: tests/host/*/run.sh built with the PC compiler, no firmware build or device
+distenv.PhonyTarget(
+    "test_host",
+    [
+        [
+            "bash",
+            "${ROOT_DIR.abspath}/tests/host/run.sh",
+            "${ARGS}",
+        ]
+    ],
+)
+
 distenv.Alias("lint_all", ["lint", "lint_py", "lint_img"])
 distenv.Alias("format_all", ["format", "format_py", "format_img"])
 
