@@ -23,5 +23,7 @@ NfcCommand nfc_cli_dump_poller_callback_iso14443_3b(NfcGenericEvent event, void*
         furi_semaphore_release(instance->sem_done);
     }
 
-    return NfcCommandContinue;
+    // Not NfcCommandContinue: that never tells the reader to stop, and its highest priority
+    // thread would keep calling this for ever, with the shell's thread never running again.
+    return command;
 }

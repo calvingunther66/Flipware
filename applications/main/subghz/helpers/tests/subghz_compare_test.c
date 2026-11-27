@@ -3,10 +3,8 @@
  * Not built into the firmware (excluded in applications/main/subghz/application.fam).
  *
  * Run from the repo root:
- *   cc -std=c11 -Wall -Wextra -Werror -I applications/main/subghz/helpers \
- *      applications/main/subghz/helpers/subghz_compare.c \
- *      applications/main/subghz/helpers/tests/subghz_compare_test.c -o /tmp/subghz_compare_test \
- *      && /tmp/subghz_compare_test
+ *   tests/host/subghz_compare/run.sh
+ * or all host tests: ./fbt test_host. CI runs it on every pull request.
  */
 
 #include "subghz_compare.h"

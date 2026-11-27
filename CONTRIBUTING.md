@@ -43,13 +43,19 @@ cd Flipware
 
 To run the on-device unit tests, see
 [documentation/UnitTests.md](documentation/UnitTests.md). Host-side tests live
-in `tests/host/`.
+in `tests/host/`; run them all with `./fbt test_host`, or `tests/host/run.sh` without
+the toolchain. CI runs them on every pull request (the Host tests workflow).
 
 ## What a pull request needs
 
 Every pull request should have:
 
-1. **A passing Build and Lint run.** Both run on every pull request.
+1. **A passing Build and Lint run.** Both run on every pull request. Build also
+   boots the firmware in the FlipperEmu emulator and runs seven checks (boot,
+   update, VGM coprocessor, BLE, serial ports, PIN lock, firmware-bug
+   regressions), except on pull
+   requests from forks, which cannot push the emulator image; see
+   [.github/emulator](.github/emulator/README.md) for what a red one means.
 2. **A changelog line** in [CHANGELOG.md](CHANGELOG.md), under Added, Updated or
    Fixed. One line, written for someone who uses the firmware, not for someone
    who reads the diff. Credit the original author when the change is not yours
@@ -57,16 +63,29 @@ Every pull request should have:
    release is tagged, that section becomes the release notes for the tag.
 3. **The size report reviewed.** Flash is almost full, so a change that grows
    the firmware has to free as much elsewhere or move code to an app on the SD
-   card. The Build run's summary lists the API version, the DFU size and the
-   free flash for `f7`. Compare it with the latest `dev` run and write the
-   difference in the pull request. (An automatic size gate is roadmap item 1.2.)
+   card. Build writes a flash and RAM report on every run (job summary, and a
+   comment on the pull request): image size, free flash below the radio stack,
+   `.data` and `.bss`, the change against the `dev` build the branch started
+   from, and the symbols that grew most. Two limits turn Build red, both set in
+   [.github/size_budget.json](.github/size_budget.json): free flash may not drop
+   below the minimum there (512 bytes for now, so there is a little headroom; it
+   goes up as Stage 2 frees space), and a pull request
+   may not grow the image by more than 512 bytes unless the maintainer has put the
+   `flash-budget` label on it (then re-run the Build job). The label lifts only
+   that growth limit, not the free-flash minimum: growth that would take free
+   flash under the minimum fails even with the label, so free space elsewhere
+   first. A pull request is checked against the limits of the branch
+   it targets, so changing `size_budget.json` takes effect once it is merged. The script is
+   `scripts/size_report.py`; its test is `tests/host/size_report/run.sh`.
 4. **A test or an emulator check.** Add a unit or host test where the code can
    be tested. For anything the emulator can show, run it in
    [FlipperEmu](https://github.com/calvingunther66/FlipperEmu) and tick
    "checked in FlipperEmu": it boots the firmware package you build, models the
    Video Game Module and has checks such as `scripts/lock_check.py` for the PIN
-   lock. A change to the lock, host sign-in, U2F or the expansion port needs an
-   emulator check.
+   lock. CI runs six of its checks on every pull request from this repository
+   (not from forks), so only what they do not cover needs a run of your own;
+   from a fork, run them yourself. A change to the lock, host sign-in, U2F or
+   the expansion port needs an emulator check.
 5. **A device check where it matters.** Tick "uploaded to a device" only if you
    did. The emulator is no substitute for a radio, a card or a real module, and
    a pull request that was only emulated should say so.

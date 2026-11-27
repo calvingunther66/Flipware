@@ -28,10 +28,16 @@ tag with no section of its own fails the release job.
 
 ### Added
 - Install guide (`documentation/Install.md`): qFlipper, SD card, moving over from Momentum and from the official firmware, what an update changes, recovery; and `documentation/ReleaseChecklist.md`, the release candidate and device pass every release goes through (#44)
+- Build: host tests for the host sign-in code, the 125 kHz RFID Add Manually formats, Sub-GHz capture compare and release notes now run in CI on every pull request, and locally with `./fbt test_host` (#40)
 
 ### Updated
 - Website: a Download button for the latest release and a link to the install guide (#44)
+- CI: every Build now boots the firmware in the FlipperEmu emulator and runs its checks: boot and radios, an update install, the VGM coprocessor, BLE pairing, the serial ports, the PIN lock and regression checks for the firmware bugs fixed here (FW-01, FW-02, FW-06). A pull request that breaks one of them turns red, with the device's logs and screenshots attached (#97)
+- CI: every Build writes a flash and RAM report (image size, free flash below the radio stack, `.data` and `.bss`, change against `dev`, symbols that grew most) as a job summary and a pull request comment, and fails when free flash drops below the budget or a PR grows the image by more than 512 bytes without the `flash-budget` label (#96)
 - Releases: pushing a `flpw-NNN` tag publishes the GitHub release by itself, with the update `.tgz` and `.zip`, the full `.dfu`, the SDK zip, `SHA256SUMS` and the changelog section as notes; `-rcN` tags are pre-releases (#94)
+
+### Fixed
+- Firmware bug burndown (roadmap 1.5, `documentation/FirmwareBugTriage.md`): an RPC request with no path no longer restarts the Flipper; the NFC shell's `dump` of an ISO14443-3B card no longer freezes it, and `dump -k` of an Ultralight C uses the key you gave; the NFC shell's `scanner` no longer restarts on a Type 4 Tag, an EMV card or an NTAG4xx (its `dump` of an EMV card still can, FW-05); reading an ST25TB card of an unknown kind is refused instead of restarting; closing the NFC app while it reads, scans or emulates no longer restarts the Flipper; the desktop no longer restarts when its slideshow is drawn too early after an update; a lost thread flag no longer freezes an NFC read; the USB-UART bridge keeps its second port; DESFire record files are dumped; a 32-bit Radio Key card is emulated with its own facility code; Sub-GHz transmit right after infrared transmit no longer loses its start; the ISO14443A listener works after ISO15693 emulation; `crypto encrypt` no longer encrypts leftover memory; the Bluetooth serial status is four bytes of its own; the JavaScript serial module sends its last two bytes (#101)
 
 ## flpw-001 - 2026-11-26
 
