@@ -13,6 +13,8 @@
 #include <toolbox/tar/tar_archive.h>
 #include <toolbox/crc32_calc.h>
 
+// Kept under its Momentum name so that people updating from Momentum don't see the
+// first-boot slideshow again. See documentation/OTA.md ("First boot flag").
 #define FIRSTBOOT_FLAG_PATH INT_PATH(".momentum_firstboot.flag")
 
 #define TAG "UpdWorkerBackup"

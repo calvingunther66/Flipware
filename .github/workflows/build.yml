@@ -2,6 +2,7 @@ name: "Build"
 
 # Pushes to dev and tags build here; every other branch builds through its
 # pull request, so a PR commit is compiled once instead of twice.
+# A tag named flpw-* also publishes a release once the build is done (release.yml).
 on:
   push:
     branches:
@@ -118,6 +119,7 @@ jobs:
           path: |
             dist/${{ env.TARGET }}-*/flipper-z-${{ env.TARGET }}-update-*
             dist/${{ env.TARGET }}-*/flipper-z-${{ env.TARGET }}-sdk-*
+            dist/${{ env.TARGET }}-*/flipper-z-${{ env.TARGET }}-full-*.dfu
 
       # Replaces the old PR comment, which needed Momentum's update server.
       - name: "Write build summary"
@@ -138,3 +140,11 @@ jobs:
             rm -rf summary-tmp
           fi
           echo "- Update package and SDK: artifact \`flipper-z-${TARGET}-${SUFFIX}\` on this run" >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/flpw-')
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/release.yml
