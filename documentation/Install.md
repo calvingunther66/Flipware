@@ -19,6 +19,10 @@ Get the files from the [latest release](https://github.com/calvingunther66/Flipw
 `-rcN` are release candidates, marked as pre-release on the releases page; use
 them only if you want to help test.
 
+`flpw-001` was published by hand, under the git tag `v1.0.0`. It has the `.tgz`,
+the `.zip` and the SDK zip, but **no `.dfu` and no `SHA256SUMS`**. Releases from
+`flpw-002` on are published by the release pipeline and have all five files.
+
 ## Before you start
 
 - **Charge the Flipper** to at least 50%. An update that loses power halfway
@@ -26,7 +30,7 @@ them only if you want to help test.
 - **Copy your SD card to your computer** if it holds anything you would miss.
   The update leaves your own files alone (see [What the update changes](#what-the-update-changes)),
   but a backup costs two minutes.
-- **Optional: check the download.** Put `SHA256SUMS` next to the files and run
+- **Optional: check the download** (releases from `flpw-002` on). Put `SHA256SUMS` next to the files and run
   `sha256sum --check --ignore-missing SHA256SUMS` (on a Mac:
   `shasum -a 256 -c SHA256SUMS --ignore-missing`).
 - Flipware is built for the Flipper Zero (hardware target `f7`). There is no
@@ -45,13 +49,14 @@ them only if you want to help test.
 
 For when you have no computer handy, or qFlipper will not talk to the Flipper.
 
-1. Download the `.zip` from the release and extract it. You get a folder named
-   like `f7-update-<tag>`.
-2. Copy that whole folder into the `update` folder on the SD card, with an SD
-   card reader or qFlipper's file manager. Make a folder `update` if there is none.
+1. Download the `.zip` from the release. Its files (`update.fuf`, `Manifest`
+   and the rest) are at the top level of the zip, with no folder around them.
+2. On the SD card, make a folder for the update inside `update`, for example
+   `SD/update/flipware`. Make `update` first if there is none. Extract the
+   zip's contents into that folder, with an SD card reader or qFlipper's file
+   manager. If your unzip tool already made a folder, copy that folder instead.
 3. On the Flipper, open the file browser (press **Down** on the main screen),
-   open `update`, then the folder you copied, and run **Update** (the
-   `update.fuf` file).
+   open `update`, then your folder, and run **Update** (the `update.fuf` file).
 4. Wait for the updater to finish; the Flipper restarts on its own.
 
 ## Moving over from Momentum
@@ -112,11 +117,12 @@ other custom firmware.
   [OTA.md](OTA.md#ota-update-error-codes). Most are fixed by trying again with
   the SD card reseated, or by installing with qFlipper instead of from the SD card.
 - **Update from SD card finds nothing**: the folder has to be inside `SD/update`
-  and the folder you open must contain the `.fuf` file directly, not another
-  folder around it.
+  and the folder you open must contain the `update.fuf` file directly, not
+  another folder around it.
 - **The Flipper does not boot.** Put it in DFU mode as Flipper Devices'
   recovery guide describes and flash the `.dfu` with qFlipper. The `.dfu`
-  replaces the firmware only and does not touch the radio stack; run a normal
+  replaces the firmware only and does not touch the radio stack (the `.dfu` is
+  only on releases from `flpw-002` on; for `flpw-001`, ask in an issue); run a normal
   update afterwards if the radio needs one.
 - **Anything else**: [open an issue](https://github.com/calvingunther66/Flipware/issues/new/choose)
   with the firmware you came from and what the screen showed.

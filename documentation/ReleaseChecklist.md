@@ -11,7 +11,7 @@ issue, or skipped with the reason.
 ## 1. Freeze
 
 - All pull requests meant for the release are merged and `dev` is green
-  (Build, Lint, host tests, emulator checks).
+  (Build and Lint, plus the host tests and emulator checks once they are on `dev`).
 - `CHANGELOG.md` has every change under `## Unreleased`.
 
 ## 2. Release candidate
@@ -59,7 +59,9 @@ Also write down: the firmware version and API version each Flipper had before
    ReadMe and the website still matches [Install.md](Install.md), and merge.
 2. Push the tag `flpw-NNN` on that commit. The Build for the tag publishes the
    release. A final tag with no changelog section fails the release job.
-3. Open the release and check: all five files are attached, `SHA256SUMS`
+3. Open the release and check: all five files are attached (the update `.tgz`
+   and `.zip`, the full `.dfu`, the SDK `.zip` and `SHA256SUMS`; `flpw-001` was
+   cut by hand and has only three of them), `SHA256SUMS`
    matches (`sha256sum --check --ignore-missing SHA256SUMS`), the notes are the
    section you wrote, and the download links work.
 4. Install the published `.tgz` once more from a clean download, on a Flipper
