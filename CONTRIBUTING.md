@@ -51,8 +51,9 @@ the toolchain. CI runs them on every pull request (the Host tests workflow).
 Every pull request should have:
 
 1. **A passing Build and Lint run.** Both run on every pull request. Build also
-   boots the firmware in the FlipperEmu emulator and runs six checks (boot,
-   update, VGM coprocessor, BLE, serial ports, PIN lock), except on pull
+   boots the firmware in the FlipperEmu emulator and runs seven checks (boot,
+   update, VGM coprocessor, BLE, serial ports, PIN lock, firmware-bug
+   regressions), except on pull
    requests from forks, which cannot push the emulator image; see
    [.github/emulator](.github/emulator/README.md) for what a red one means.
 2. **A changelog line** in [CHANGELOG.md](CHANGELOG.md), under Added, Updated or

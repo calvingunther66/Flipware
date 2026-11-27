@@ -5,7 +5,7 @@
 #
 #   run-check.sh CHECK FIRMWARE_DIR OUT_DIR
 #
-# CHECK is one of smoke, update, vgm, ble, uart, lock. FIRMWARE_DIR is searched
+# CHECK is one of smoke, update, vgm, ble, uart, lock, fwbugs. FIRMWARE_DIR is searched
 # for flipper-z-f7-update-*.tgz. The check's output goes to OUT_DIR/CHECK.log;
 # when it fails, the logs, screenshots and recordings of its emulated devices
 # are put in OUT_DIR as well. Exit status is the check's (124 when it ran past
@@ -33,6 +33,7 @@ case "$check" in
     ble)    cmd=(python3 scripts/ble_check.py "$fw" --keep) ;;
     uart)   cmd=(python3 scripts/uart_check.py "$fw" --keep) ;;
     lock)   cmd=(python3 scripts/lock_check.py "$fw" --keep) ;;
+    fwbugs) cmd=(python3 scripts/fwbugs_check.py "$fw" --keep) ;;
     *)
         echo "Unknown check: $check"
         exit 2

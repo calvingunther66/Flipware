@@ -93,7 +93,8 @@ jobs:
         # ble: pairing and RPC over BLE (scripts/ble_check.py)
         # uart: the header's serial ports and the expansion link (scripts/uart_check.py)
         # lock: a module on the expansion port cannot unlock the PIN lock (scripts/lock_check.py)
-        check: [smoke, update, vgm, ble, uart, lock]
+        # fwbugs: regression checks for the FW-xx bugs fixed in Flipware (scripts/fwbugs_check.py)
+        check: [smoke, update, vgm, ble, uart, lock, fwbugs]
     steps:
       - name: "Checkout code"
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
