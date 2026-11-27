@@ -176,8 +176,15 @@ jobs:
           fi
           if gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name "size-report-$TARGET" --dir size-baseline ; then
             echo "note=$note (run $run_id)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "That build has no size report (older than this feature, or expired). Trying the latest dev build."
+          latest_id=$(find_run) || true
+          if [ -n "$latest_id" ] && [ "$latest_id" != "$run_id" ] \
+              && gh run download "$latest_id" --repo "$GITHUB_REPOSITORY" --name "size-report-$TARGET" --dir size-baseline ; then
+            echo "note=latest dev build (run $latest_id)" >> "$GITHUB_OUTPUT"
           else
-            echo "That build has no size report (too old or expired)."
+            echo "No size report to compare with."
           fi
 
       # The numbers, the comparison and the gates are in scripts/size_report.py;
@@ -189,11 +196,14 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BASELINE_NOTE: ${{ steps.baseline.outputs.note }}
         run: |
-          growth=""
+          # The growth limit is for pull requests. After a merge (push to dev) and
+          # on tags it is skipped, so a PR that was allowed to grow by the
+          # flash-budget label doesn't turn dev red; the free-flash minimum still applies.
+          growth="--growth-allowed"
           if [ -n "$PR_NUMBER" ] ; then
             labels=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" --jq '.[].name' || true)
-            if echo "$labels" | grep -qx flash-budget ; then
-              growth="--growth-allowed"
+            if ! echo "$labels" | grep -qx flash-budget ; then
+              growth=""
             fi
           fi
           elf=$(ls dist/${TARGET}-*/flipper-z-${TARGET}-firmware-*.elf | head -n1)

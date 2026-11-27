@@ -139,13 +139,18 @@ def read_elf(path):
 
 
 def parse_radio_address(manifest_text):
-    """Return the `Radio address` from the text of an update.fuf manifest."""
+    """Return the `Radio address` from the text of an update.fuf manifest.
+
+    The manifest is a Flipper File Format file, and scripts/update.py writes
+    integers in it as hex bytes, least significant byte first: 0x080D7000 is
+    `Radio address: 00 70 0D 08`.
+    """
     match = re.search(
-        r"^Radio address:\s*(0[xX][0-9A-Fa-f]+|\d+)\s*$", manifest_text, re.M
+        r"^Radio address:[ \t]*((?:[0-9A-Fa-f]{2}[ \t]*)+)$", manifest_text, re.M
     )
     if not match:
         raise ValueError("update.fuf has no 'Radio address' line")
-    value = int(match.group(1), 0)
+    value = int.from_bytes(bytes.fromhex("".join(match.group(1).split())), "little")
     if value == 0:
         raise ValueError(
             "update.fuf has radio address 0 (a package without a radio stack)"

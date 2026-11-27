@@ -136,7 +136,7 @@ def write(path, data, mode="wb"):
         f.write(data)
 
 
-def update_dir(root, radio="0x080D7000"):
+def update_dir(root, radio="00 70 0D 08"):
     path = os.path.join(root, "f7-update")
     os.makedirs(path, exist_ok=True)
     write(
@@ -209,11 +209,14 @@ class Report(unittest.TestCase):
         self.assertEqual({".text", ".rodata", ".data", ".bss"}, set(names))
 
     def test_radio_address_parsing(self):
-        self.assertEqual(size_report.parse_radio_address("A: 1\nRadio address: 0x080D7000\n"), 0x080D7000)
+        # as scripts/update.py writes it: hex bytes, least significant first
+        self.assertEqual(size_report.parse_radio_address("A: 1\nRadio address: 00 70 0D 08\nB: 2\n"), 0x080D7000)
+        self.assertEqual(size_report.parse_radio_address("Radio address: 00 70 0D 08"), 0x080D7000)
+        self.assertEqual(size_report.parse_radio_address("Radio address: 00 00 0F 08\n"), 0x080F0000)
         with self.assertRaises(ValueError):
             size_report.parse_radio_address("Filetype: x\n")
         with self.assertRaises(ValueError):
-            size_report.parse_radio_address("Radio address: 0x00000000\n")
+            size_report.parse_radio_address("Radio address: 00 00 00 00\n")
 
 
 class Compare(unittest.TestCase):
