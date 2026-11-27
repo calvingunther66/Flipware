@@ -36,6 +36,8 @@ first (the `image` job, about 10 minutes); every other run only pulls it.
   push cannot turn Flipware's pull requests red.
 - `run-check.sh` is not in the image: the workflow mounts it, so a change to how the
   checks are run does not rebuild QEMU.
+- The image is built on Python 3.13: FlipperEmu's launcher needs 3.13 or newer (3.12's
+  argparse rejects commands such as `uart send --hex 41 42`).
 - Pull requests from forks are skipped: they cannot push the image.
 
 ## Running it by hand

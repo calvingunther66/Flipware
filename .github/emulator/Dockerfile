@@ -3,7 +3,10 @@
 # checks" workflow and kept in GitHub's container registry (see README.md).
 #
 #   docker build --build-arg FLIPPEREMU_REF=$(cat flipperemu.pin) .github/emulator
-FROM ubuntu:24.04
+# Python 3.13 or newer: FlipperEmu's launcher parses `uart send --hex 41 42` and
+# similar commands the way 3.13's argparse does; Ubuntu 24.04's 3.12 (and older)
+# rejects them, and uart_check fails 12 of its 75 checks.
+FROM python:3.13-bookworm
 
 ARG FLIPPEREMU_REF
 ARG DEBIAN_FRONTEND=noninteractive
@@ -17,11 +20,11 @@ LABEL org.opencontainers.image.description="FlipperEmu (QEMU with the Flipper Ze
 # Pillow and numpy are used by the screenshot and Sub-GHz checks.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-        build-essential ca-certificates curl flex bison git gpg libfdt-dev \
+        build-essential ca-certificates curl flex bison git gnupg libfdt-dev \
         libglib2.0-dev libgtk-3-dev libpixman-1-dev libslirp-dev ninja-build \
-        patch pkg-config python3 python3-numpy python3-pil python3-pip \
-        python3-venv xz-utils dosfstools mtools procps \
- && rm -rf /var/lib/apt/lists/*
+        patch pkg-config xz-utils dosfstools mtools procps \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install --no-cache-dir pillow numpy
 
 RUN test -n "$FLIPPEREMU_REF" \
  && git clone --quiet https://github.com/calvingunther66/FlipperEmu /opt/flipperemu \
