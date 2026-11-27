@@ -1,5 +1,5 @@
 {
-  "min_free_flash_bytes": 976,
+  "min_free_flash_bytes": 512,
   "max_growth_bytes": 512,
   "label": "flash-budget"
 }
