@@ -27,6 +27,7 @@ tag with no section of its own fails the release job.
 ## Unreleased
 
 ### Updated
+- CI: every Build writes a flash and RAM report (image size, free flash below the radio stack, `.data` and `.bss`, change against `dev`, symbols that grew most) as a job summary and a pull request comment, and fails when free flash drops below the budget or a PR grows the image by more than 512 bytes without the `flash-budget` label (#PR)
 - Releases: pushing a `flpw-NNN` tag publishes the GitHub release by itself, with the update `.tgz` and `.zip`, the full `.dfu`, the SDK zip, `SHA256SUMS` and the changelog section as notes; `-rcN` tags are pre-releases (#94)
 
 ## flpw-001 - 2026-11-26

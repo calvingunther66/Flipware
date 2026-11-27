@@ -24,6 +24,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read # download the size report of the build to compare with
+      pull-requests: read # read the labels of the pull request (flash-budget)
     strategy:
       fail-fast: false
       matrix:
@@ -121,25 +125,128 @@ jobs:
             dist/${{ env.TARGET }}-*/flipper-z-${{ env.TARGET }}-sdk-*
             dist/${{ env.TARGET }}-*/flipper-z-${{ env.TARGET }}-full-*.dfu
 
-      # Replaces the old PR comment, which needed Momentum's update server.
       - name: "Write build summary"
         run: |
-          dfu=$(ls dist/${TARGET}-*/flipper-z-${TARGET}-full-*.dfu | head -n1)
-          dfu_size=$(du --apparent-size -B 1 "$dfu" | cut -f1)
           {
             echo "### ${TARGET} firmware for \`${COMMIT_SHA}\`"
             echo "- API version: \`${{ steps.build-fw.outputs.firmware_api }}\`"
-            echo "- DFU size: \`$(numfmt --to=iec-i --format=%.2fB "$dfu_size")\`"
+            echo "- Update package and SDK: artifact \`flipper-z-${TARGET}-${SUFFIX}\` on this run"
           } >> "$GITHUB_STEP_SUMMARY"
-          if [ -f build/core2_firmware.tgz ] ; then
-            mkdir -p summary-tmp
-            tar xzf build/core2_firmware.tgz -C summary-tmp
-            radio_addr=$(jq -r '.copro.radio.files[0].address' summary-tmp/core2_firmware/Manifest.json)
-            flash_free=$((radio_addr - 0x8000000 - dfu_size))
-            echo "- Free flash: \`$(numfmt --to=iec-i --format=%.2fB "$flash_free")\`" >> "$GITHUB_STEP_SUMMARY"
-            rm -rf summary-tmp
+
+      # Find the build to compare flash and RAM with: for a pull request, the dev
+      # build of the commit it branched from (or the latest dev build); for a
+      # push to dev, the build of the previous dev commit.
+      - name: "Find the build to compare with"
+        id: baseline
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -e
+          mkdir -p size-baseline
+          base_sha=""
+          if [ "$EVENT" = pull_request ] ; then
+            base_sha=$(gh api "repos/$GITHUB_REPOSITORY/compare/dev...$PR_HEAD" --jq .merge_base_commit.sha) || true
+          elif [ "$EVENT" = push ] && [ "$GITHUB_REF" = refs/heads/dev ] ; then
+            base_sha="$PUSH_BEFORE"
+          else
+            echo "No comparison for this kind of build."
+            exit 0
           fi
-          echo "- Update package and SDK: artifact \`flipper-z-${TARGET}-${SUFFIX}\` on this run" >> "$GITHUB_STEP_SUMMARY"
+          find_run() {
+            gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml --branch dev \
+              --event push --status success --limit 1 "$@" --json databaseId --jq '.[0].databaseId // empty'
+          }
+          run_id=""
+          note=""
+          if [ -n "$base_sha" ] ; then
+            run_id=$(find_run --commit "$base_sha") || true
+            note="dev build ${base_sha:0:8}"
+          fi
+          if [ -z "$run_id" ] ; then
+            run_id=$(find_run) || true
+            note="latest dev build"
+          fi
+          if [ -z "$run_id" ] ; then
+            echo "No earlier dev build found."
+            exit 0
+          fi
+          if gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name "size-report-$TARGET" --dir size-baseline ; then
+            echo "note=$note (run $run_id)" >> "$GITHUB_OUTPUT"
+          else
+            echo "That build has no size report (too old or expired)."
+          fi
+
+      # The numbers, the comparison and the gates are in scripts/size_report.py;
+      # the limits are in .github/size_budget.json. Runs last so a red gate still
+      # leaves the packages uploaded; the report is uploaded and commented either way.
+      - name: "Flash and RAM report"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASELINE_NOTE: ${{ steps.baseline.outputs.note }}
+        run: |
+          growth=""
+          if [ -n "$PR_NUMBER" ] ; then
+            labels=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" --jq '.[].name' || true)
+            if echo "$labels" | grep -qx flash-budget ; then
+              growth="--growth-allowed"
+            fi
+          fi
+          elf=$(ls dist/${TARGET}-*/flipper-z-${TARGET}-firmware-*.elf | head -n1)
+          update_dir=$(ls -d dist/${TARGET}-*/${TARGET}-update-*/ | head -n1)
+          status=0
+          python3 scripts/size_report.py --elf "$elf" --update-dir "$update_dir" \
+            --budget .github/size_budget.json --target "$TARGET" $growth \
+            --baseline "size-baseline/size-$TARGET.json" \
+            --baseline-note "${BASELINE_NOTE:-nothing (no earlier build to compare with)}" \
+            --out-json "size-$TARGET.json" --out-md "size-report.md" || status=$?
+          cat size-report.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - name: "Upload the size report"
+        if: ${{ !cancelled() && hashFiles('size-report.md') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: size-report-${{ env.TARGET }}
+          path: |
+            size-${{ env.TARGET }}.json
+            size-report.md
+
+  # Posts (or updates) the size report as a comment on the pull request. It is a
+  # separate job so that the job that builds the pull request's code never holds
+  # a token that can write to the pull request. On a fork's pull request the
+  # token is read-only; the comment is skipped and the report is still in the
+  # job summary.
+  size-comment:
+    needs: build
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: "Post the size report"
+        continue-on-error: true
+        run: |
+          set -e
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'size-report-*' --dir report || { echo "No size report to post."; exit 0; }
+          file=$(ls report/*/size-report.md | head -n1)
+          marker='<!-- flipware-size-report -->'
+          head -n1 "$file" | grep -qxF "$marker" || { echo "Unexpected report format."; exit 1; }
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | startswith("'"$marker"'")) | .id' | head -n1)
+          if [ -n "$id" ] ; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@"$file" > /dev/null
+          else
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$file"
+          fi
 
   release:
     needs: build

@@ -57,9 +57,15 @@ Every pull request should have:
    release is tagged, that section becomes the release notes for the tag.
 3. **The size report reviewed.** Flash is almost full, so a change that grows
    the firmware has to free as much elsewhere or move code to an app on the SD
-   card. The Build run's summary lists the API version, the DFU size and the
-   free flash for `f7`. Compare it with the latest `dev` run and write the
-   difference in the pull request. (An automatic size gate is roadmap item 1.2.)
+   card. Build writes a flash and RAM report on every run (job summary, and a
+   comment on the pull request): image size, free flash below the radio stack,
+   `.data` and `.bss`, the change against the `dev` build the branch started
+   from, and the symbols that grew most. Two limits turn Build red, both set in
+   [.github/size_budget.json](.github/size_budget.json): free flash may not drop
+   below the minimum there (it goes up as Stage 2 frees space), and a pull request
+   may not grow the image by more than 512 bytes unless the maintainer has put the
+   `flash-budget` label on it (then re-run the Build job). The script is
+   `scripts/size_report.py`; its test is `tests/host/size_report/run.sh`.
 4. **A test or an emulator check.** Add a unit or host test where the code can
    be tested. For anything the emulator can show, run it in
    [FlipperEmu](https://github.com/calvingunther66/FlipperEmu) and tick
