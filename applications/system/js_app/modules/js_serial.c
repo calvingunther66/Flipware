@@ -111,6 +111,9 @@ static void js_serial_setup(struct mjs* mjs) {
 
 static void js_serial_deinit(JsSerialInst* js_serial) {
     if(js_serial->setup_done) {
+        // The last two bytes of a write are still in the UART: let them go out before it is
+        // switched off.
+        furi_hal_serial_tx_wait_complete(js_serial->serial_handle);
         furi_hal_serial_async_rx_stop(js_serial->serial_handle);
         furi_hal_serial_deinit(js_serial->serial_handle);
         furi_hal_serial_control_release(js_serial->serial_handle);

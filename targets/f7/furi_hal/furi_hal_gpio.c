@@ -128,19 +128,26 @@ void furi_hal_gpio_init_ex(
         // Set pin in interrupt mode
         LL_GPIO_SetPinMode(gpio->port, gpio->pin, LL_GPIO_MODE_INPUT);
         LL_SYSCFG_SetEXTISource(sys_exti_port, sys_exti_line);
-        if(mode == GpioModeInterruptRise || mode == GpioModeInterruptRiseFall) {
+        // Only the edges that this mode asks for: a trigger that an earlier mode of the line
+        // left on (rise and fall, for a signal reader) stayed on when it was set to rise only.
+        const bool rising = mode == GpioModeInterruptRise || mode == GpioModeInterruptRiseFall ||
+                            mode == GpioModeEventRise || mode == GpioModeEventRiseFall;
+        const bool falling = mode == GpioModeInterruptFall ||
+                             mode == GpioModeInterruptRiseFall || mode == GpioModeEventFall ||
+                             mode == GpioModeEventRiseFall;
+        if(rising) {
             LL_EXTI_EnableRisingTrig_0_31(exti_line);
+        } else {
+            LL_EXTI_DisableRisingTrig_0_31(exti_line);
         }
-        if(mode == GpioModeInterruptFall || mode == GpioModeInterruptRiseFall) {
+        if(falling) {
             LL_EXTI_EnableFallingTrig_0_31(exti_line);
+        } else {
+            LL_EXTI_DisableFallingTrig_0_31(exti_line);
         }
-        if(mode == GpioModeEventRise || mode == GpioModeEventRiseFall) {
+        if(mode == GpioModeEventRise || mode == GpioModeEventRiseFall ||
+           mode == GpioModeEventFall) {
             LL_EXTI_EnableEvent_0_31(exti_line);
-            LL_EXTI_EnableRisingTrig_0_31(exti_line);
-        }
-        if(mode == GpioModeEventFall || mode == GpioModeEventRiseFall) {
-            LL_EXTI_EnableEvent_0_31(exti_line);
-            LL_EXTI_EnableFallingTrig_0_31(exti_line);
         }
     } else {
         // Disable interrupts if set

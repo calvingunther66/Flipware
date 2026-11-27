@@ -77,10 +77,13 @@ void crypto_cli_encrypt(PipeSide* pipe, FuriString* args) {
             if(remain) {
                 size = size - remain + 16;
             }
-            furi_string_reserve(input, size);
+            // Zeros after the text and its terminator, not whatever the heap held there
+            uint8_t* plain = calloc(1, size);
+            memcpy(plain, furi_string_get_cstr(input), furi_string_size(input));
             uint8_t* output = malloc(size);
-            if(!furi_hal_crypto_encrypt(
-                   (const uint8_t*)furi_string_get_cstr(input), output, size)) {
+            bool encrypted = furi_hal_crypto_encrypt(plain, output, size);
+            free(plain);
+            if(!encrypted) {
                 printf("Failed to encrypt input");
             } else {
                 printf("Hex-encoded encrypted data:\r\n");

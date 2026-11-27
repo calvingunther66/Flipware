@@ -258,6 +258,8 @@ St25tbType st25tb_get_type_from_uid(const uint8_t* uid) {
     case 0xf:
         return St25tbType02k;
     default:
-        furi_crash("unsupported st25tb type");
+        // The UID comes from the card, so a card decides it: a chip this firmware does not
+        // know is not a reason to crash.
+        return St25tbTypeNum;
     }
 }

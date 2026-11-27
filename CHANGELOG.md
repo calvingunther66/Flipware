@@ -26,6 +26,9 @@ tag with no section of its own fails the release job.
 
 ## Unreleased
 
+### Fixed
+- Firmware bug burndown (roadmap 1.5, `documentation/FirmwareBugTriage.md`): an RPC request with no path no longer restarts the Flipper; the NFC shell's `dump` of an ISO14443-3B card no longer freezes it, and `dump -k` of an Ultralight C uses the key you gave; the NFC shell no longer restarts on a Type 4 Tag, an EMV card or an NTAG4xx; reading an ST25TB card of an unknown kind is refused instead of restarting; closing the NFC app while it reads, scans or emulates no longer restarts the Flipper; the desktop no longer restarts when its slideshow is drawn too early after an update; a lost thread flag no longer freezes an NFC read; the USB-UART bridge keeps its second port; DESFire record files are dumped; a 32-bit Radio Key card is emulated with its own facility code; Sub-GHz transmit right after infrared transmit no longer loses its start; the ISO14443A listener works after ISO15693 emulation; `crypto encrypt` no longer encrypts leftover memory; the Bluetooth serial status is four bytes of its own; the JavaScript serial module sends its last two bytes
+
 ### Updated
 - Releases: pushing a `flpw-NNN` tag publishes the GitHub release by itself, with the update `.tgz` and `.zip`, the full `.dfu`, the SDK zip, `SHA256SUMS` and the changelog section as notes; `-rcN` tags are pre-releases (#94)
 

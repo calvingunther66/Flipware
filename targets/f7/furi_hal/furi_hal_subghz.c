@@ -814,6 +814,15 @@ bool furi_hal_subghz_start_async_tx(FuriHalSubGhzAsyncTxCallback callback, void*
     LL_DMA_Init(SUBGHZ_DMA_CH1_DEF, &dma_config); // Setup DMA with settings structure
     // setup interrupt for DMA. When DMA generate interrupt event we call furi_hal_subghz_async_tx_dma_isr
     furi_hal_interrupt_set_isr(SUBGHZ_DMA_CH1_IRQ, furi_hal_subghz_async_tx_dma_isr, NULL);
+    // The channel was used by someone else before (the infrared transmitter leaves its
+    // half-transfer flag set): a flag left over would run the refill before the first fill.
+#if SUBGHZ_DMA_CH1_CHANNEL == LL_DMA_CHANNEL_1
+    LL_DMA_ClearFlag_HT1(SUBGHZ_DMA);
+    LL_DMA_ClearFlag_TC1(SUBGHZ_DMA);
+    LL_DMA_ClearFlag_TE1(SUBGHZ_DMA);
+#else
+#error Update this code. Would you kindly?
+#endif
     LL_DMA_EnableIT_TC(SUBGHZ_DMA_CH1_DEF); // interrupt for full buffer sent
     LL_DMA_EnableIT_HT(SUBGHZ_DMA_CH1_DEF); // interrupt for half buffer sent
     LL_DMA_EnableChannel(SUBGHZ_DMA_CH1_DEF); // Enable

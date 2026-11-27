@@ -74,6 +74,11 @@ bool st25tb_set_uid(St25tbData* data, const uint8_t* uid, size_t uid_len);
 
 St25tbData* st25tb_get_base_data(const St25tbData* data);
 
+/**
+ * @brief Find the chip type that a UID names.
+ *
+ * @return St25tbTypeNum when the UID names no chip that is known.
+ */
 St25tbType st25tb_get_type_from_uid(const uint8_t* uid);
 
 #ifdef __cplusplus

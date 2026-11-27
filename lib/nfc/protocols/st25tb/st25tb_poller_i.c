@@ -136,6 +136,11 @@ St25tbError st25tb_poller_select(St25tbPoller* instance, uint8_t* chip_id_ptr) {
         }
 
         instance->data->type = st25tb_get_type_from_uid(instance->data->uid);
+        if(instance->data->type == St25tbTypeNum) {
+            FURI_LOG_E(TAG, "Unknown ST25TB chip type");
+            ret = St25tbErrorNotPresent;
+            break;
+        }
     } while(false);
 
     return ret;
