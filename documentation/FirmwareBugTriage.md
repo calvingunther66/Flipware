@@ -11,13 +11,16 @@ could not build the firmware**, so the Build run of the pull request is the comp
 column "Check" says what in FlipperEmu's `scripts/fwbugs_check.py` (or another FlipperEmu
 script) covers the fix. A fix with no emulator check says why.
 
+Later, on this branch's build: FW-01 was checked on a Flipper, and FW-01, FW-02 and FW-06 in the
+emulator. The same emulator run reproduced FW-05.
+
 | No. | Status | What was done | Check |
 | --- | --- | --- | --- |
 | FW-01 | Fixed | A storage RPC request with no path is answered `ERROR_INVALID_PARAMETERS` (list, info, stat, timestamp, read, rename, backup, tar extract), instead of reaching `strcmp(NULL)` | `fwbugs_check.py`: the 11-byte message |
 | FW-02 | Fixed | The ISO14443-3B `dump` callback returns the command it chose (`NfcCommandStop`), not `NfcCommandContinue` | `fwbugs_check.py`: `fuzz nfc --replay` of a 3B card |
 | FW-03 | Fixed | `st25tb_get_type_from_uid()` returns `St25tbTypeNum` for a UID that names no known chip; the poller and `st25tb_poller_sync_detect_type()` report `St25tbErrorNotPresent` | none: needs an ST25TB card file the emulator has no helper for |
 | FW-04 | Fixed already | The NFC shell's protocol names come from the protocol layer (`nfc_cli_get_protocol_name()`), so a protocol without a hand-made entry (Type 4 Tag, NTAG4xx, EMV's ISO14443-4A) no longer reaches `printf("%s", NULL)`. Came with the Texkom change (`7673bcd`) | `fwbugs_check.py`: `fuzz nfc` |
-| FW-05 | Not reproduced | Seen on Unleashed's `dump` of an EMV card, whose source was not read. Flipware's NFC shell is Momentum's, and nothing in it matches; the `fuzz nfc` run of the check would show it | `fwbugs_check.py`: `fuzz nfc` |
+| FW-05 | Deferred | Reproduced after the fixes were written: `fuzz nfc --runs 16 --seed 1` ends in `[CRASH][dump] furi_check failed` when the NFC shell's `dump` reads an EMV card. The `flpw-001` release does the same, so it is older than these fixes. Not fixed here; its cause has not been looked for | `fwbugs_check.py`: `fuzz nfc` (fails on it) |
 | FW-06 | Fixed | `nfc_app_free()` stops the current scene (`scene_manager_stop()`: the scanner and the listener) and the poller before `nfc_free()` checks that the NFC worker is idle | `fwbugs_check.py`: `app NFC`, Read, `app --close` |
 | FW-07 | Fixed already | `26bdd91` | |
 | FW-08 | Fixed | The slideshow view's draw, input and timer callbacks do nothing while the view has no slideshow, and the exit callback sets the pointer back to NULL after freeing it | none: needs a loaded host, 6 in 50 updates |
