@@ -4,7 +4,7 @@ Status: **protocol v2, untested on hardware.**
 - The firmware builds, and its core has host tests: known-answer vectors, a fuzzed parser and a fuzzed DER decoder under ASan/UBSan.
 - The Mac tool builds, and its message format is checked against OpenSSL.
 - The Windows/Linux tool passes its self-test, but has never been used with a real authenticator.
-- See [What still needs hardware testing](#what-still-needs-hardware-testing).
+- See [What still needs hardware testing](#what-still-needs-hardware-testing); [HostAuthHardwareTest.md](HostAuthHardwareTest.md) has it as a step-by-step runbook with the expected output of each step.
 
 ## What "sign in" means
 
@@ -331,6 +331,8 @@ They only do symmetric AES (CBC, CTR, GCM). There is no ECC and no signing in th
 - `scripts/hostauth-fido2/`: Windows/Linux tool (untested).
 
 ## What still needs hardware testing
+
+The runbook with commands and expected results is [HostAuthHardwareTest.md](HostAuthHardwareTest.md). What it covers:
 
 **Locked-mode shell:**
 - After a lock, and after a reboot with lock on boot, `help` lists only `hostauth`.
