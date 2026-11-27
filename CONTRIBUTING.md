@@ -50,7 +50,11 @@ the toolchain. CI runs them on every pull request (the Host tests workflow).
 
 Every pull request should have:
 
-1. **A passing Build and Lint run.** Both run on every pull request.
+1. **A passing Build and Lint run.** Both run on every pull request. Build also
+   boots the firmware in the FlipperEmu emulator and runs six checks (boot,
+   update, VGM coprocessor, BLE, serial ports, PIN lock), except on pull
+   requests from forks, which cannot push the emulator image; see
+   [.github/emulator](.github/emulator/README.md) for what a red one means.
 2. **A changelog line** in [CHANGELOG.md](CHANGELOG.md), under Added, Updated or
    Fixed. One line, written for someone who uses the firmware, not for someone
    who reads the diff. Credit the original author when the change is not yours
@@ -77,8 +81,10 @@ Every pull request should have:
    [FlipperEmu](https://github.com/calvingunther66/FlipperEmu) and tick
    "checked in FlipperEmu": it boots the firmware package you build, models the
    Video Game Module and has checks such as `scripts/lock_check.py` for the PIN
-   lock. A change to the lock, host sign-in, U2F or the expansion port needs an
-   emulator check.
+   lock. CI runs six of its checks on every pull request from this repository
+   (not from forks), so only what they do not cover needs a run of your own;
+   from a fork, run them yourself. A change to the lock, host sign-in, U2F or
+   the expansion port needs an emulator check.
 5. **A device check where it matters.** Tick "uploaded to a device" only if you
    did. The emulator is no substitute for a radio, a card or a real module, and
    a pull request that was only emulated should say so.

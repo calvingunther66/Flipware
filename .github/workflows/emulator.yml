@@ -1,0 +1,156 @@
+name: "Emulator checks"
+
+# Boots the firmware that Build made in FlipperEmu (QEMU with the Flipper Zero
+# board) and runs its checks against it. Build calls this after it has uploaded
+# the update package. To run the checks on an earlier Build run, start this
+# workflow by hand and give it that run's number.
+#
+# The emulator is built once into a container image in GitHub's container
+# registry, tagged with a hash of .github/emulator/ (see the README there), so a
+# pull request does not build QEMU again.
+on:
+  workflow_call:
+    inputs:
+      build-run:
+        description: "ID of the Build run to take the firmware from (this run when empty)"
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      build-run:
+        description: "ID of the Build run to take the firmware from (the number after /actions/runs/ in its URL, not the run number)"
+        type: string
+        required: true
+
+# Each job asks for what it needs: only the image job may push to the registry.
+permissions:
+  contents: read
+
+env:
+  BUILD_RUN: ${{ inputs.build-run || github.run_id }}
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write # push the emulator image when there is none for this pin
+    outputs:
+      ref: ${{ steps.tag.outputs.ref }}
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: .github/emulator
+
+      - name: "Name the image"
+        id: tag
+        run: |
+          hash=$(cat .github/emulator/Dockerfile .github/emulator/flipperemu.pin | sha256sum | cut -c1-12)
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "ref=ghcr.io/${owner}/flipware-emulator:${hash}" >> "$GITHUB_OUTPUT"
+
+      - name: "Log in to the registry"
+        env:
+          TOKEN: ${{ github.token }}
+        run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: "Build the image if there is none for this pin"
+        env:
+          IMAGE: ${{ steps.tag.outputs.ref }}
+        run: |
+          if docker manifest inspect "$IMAGE" > /dev/null 2>&1 ; then
+            echo "$IMAGE exists." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "No $IMAGE yet: building FlipperEmu $(cat .github/emulator/flipperemu.pin)."
+          docker build --build-arg FLIPPEREMU_REF="$(cat .github/emulator/flipperemu.pin)" \
+            -t "$IMAGE" .github/emulator
+          if ! docker push "$IMAGE" ; then
+            echo "::error title=Emulator image push denied::Could not push $IMAGE. If the package already exists, give this repository Write access under the package's settings (Manage Actions access), or use another image name in .github/workflows/emulator.yml."
+            exit 1
+          fi
+          echo "Built and pushed $IMAGE." >> "$GITHUB_STEP_SUMMARY"
+
+  check:
+    name: "emulator (${{ matrix.check }})"
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read   # download the firmware of the Build run
+      packages: read  # pull the emulator image
+    strategy:
+      fail-fast: false
+      matrix:
+        # smoke: boot, SD card, input, radios (scripts/smoke_test.py)
+        # update: an update package installs (scripts/update_check.py)
+        # vgm: the Video Game Module and Flipware's coprocessor (vgm_check.py --coproc)
+        # ble: pairing and RPC over BLE (scripts/ble_check.py)
+        # uart: the header's serial ports and the expansion link (scripts/uart_check.py)
+        # lock: a module on the expansion port cannot unlock the PIN lock (scripts/lock_check.py)
+        check: [smoke, update, vgm, ble, uart, lock]
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: .github/emulator
+
+      - name: "Get the firmware of the Build run"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$BUILD_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'flipper-z-f7-*' --dir firmware
+          find firmware -name 'flipper-z-f7-update-*.tgz'
+
+      - name: "Pull the emulator image"
+        env:
+          TOKEN: ${{ github.token }}
+          IMAGE: ${{ needs.image.outputs.ref }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker pull --quiet "$IMAGE"
+
+      # The step limit is longer than run-check.sh's own (11 minutes) and shorter
+      # than the job's, so a hung check is stopped by the script, which still
+      # packages the device logs, and the failure artifact is uploaded.
+      - name: "Run the check"
+        timeout-minutes: 13
+        env:
+          IMAGE: ${{ needs.image.outputs.ref }}
+        run: |
+          mkdir -p out
+          docker run --rm --init --shm-size=1g \
+            -v "$PWD/firmware:/firmware:ro" \
+            -v "$PWD/out:/out" \
+            -v "$PWD/.github/emulator/run-check.sh:/run-check.sh:ro" \
+            "$IMAGE" /run-check.sh "${{ matrix.check }}" /firmware /out
+
+      - name: "Write the summary"
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "### Emulator check: ${{ matrix.check }}"
+            echo
+            echo "Firmware from Build run ${BUILD_RUN}."
+            echo
+            echo '```'
+            tail -n 40 "out/${{ matrix.check }}.log" 2>/dev/null || echo "The check did not run."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Logs of the device, its screenshots and recordings: only when it failed.
+      - name: "Keep what the emulated device left"
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: emulator-${{ matrix.check }}
+          path: out/
+          retention-days: 14
+          if-no-files-found: ignore

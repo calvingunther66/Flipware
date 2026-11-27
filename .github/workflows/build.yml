@@ -285,3 +285,19 @@ jobs:
       contents: write
       actions: read
     uses: ./.github/workflows/release.yml
+
+  # Boots the update package in FlipperEmu and runs its checks (boot, update,
+  # coprocessor, BLE, serial ports, PIN lock). Not run for tags (the release
+  # is built from a commit that passed on dev) or for pull requests from forks
+  # (the emulator image is kept in this repository's registry).
+  emulator:
+    needs: build
+    if: >-
+      !startsWith(github.ref, 'refs/tags/') &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    uses: ./.github/workflows/emulator.yml
