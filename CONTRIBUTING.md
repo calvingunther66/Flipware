@@ -43,7 +43,8 @@ cd Flipware
 
 To run the on-device unit tests, see
 [documentation/UnitTests.md](documentation/UnitTests.md). Host-side tests live
-in `tests/host/`.
+in `tests/host/`; run them all with `./fbt test_host`, or `tests/host/run.sh` without
+the toolchain. CI runs them on every pull request (the Host tests workflow).
 
 ## What a pull request needs
 
