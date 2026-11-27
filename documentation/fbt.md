@@ -80,6 +80,7 @@ To use language servers other than the default VS Code C/C++ language server, us
 - `lint_py`, `format_py` — run [black](https://black.readthedocs.io/en/stable/index.html) on the Python source code, build system files & app manifests. Supports `ARGS="..."` to pass extra arguments to black.
 - `lint_img`, `format_img` — check the image assets for errors and format them. Enforces color depth and strips metadata.
 - `lint_all`, `format_all` — run all linters and formatters.
+- `test_host` — run the host tests in `tests/host/` with the PC compiler (no device needed). Supports `ARGS="..."` to name the tests to run, e.g. `ARGS="host_auth subghz_compare"`. Needs `gcc`, Python with `cryptography`, and the `lib/mbedtls` and `lib/mlib` submodules.
 - `firmware_pvs` — generate a PVS Studio report for the firmware. Requires PVS Studio to be available on your system's `PATH`.
 - `doxygen` — generate Doxygen documentation for the firmware. `doxy` target also opens web browser to view the generated documentation.
 - `cli` — start a Flipper CLI session over USB.

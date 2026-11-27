@@ -1,6 +1,6 @@
 #!/bin/sh
 # Host test for the 125 kHz RFID "Enter FC/ID" helpers (applications/main/lfrfid/helpers).
-# Builds the helpers, bit_lib and the real protocol sources with a small furi shim under
+# Builds the helpers, bit_lib and the real protocol sources with the shared furi shim (tests/host/shim) under
 # AddressSanitizer and UndefinedBehaviorSanitizer, then runs the checks.
 #   tests/host/lfrfid_manual_format/run.sh
 set -eu
@@ -11,7 +11,7 @@ OUT="${TMPDIR:-/tmp}/lfrfid_manual_format_test"
 ${CC:-gcc} -std=gnu17 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=undefined \
     -Wall -Wno-unused-parameter -Wno-format -Wno-incompatible-pointer-types \
     '-D_ATTRIBUTE(x)=__attribute__(x)' \
-    -I "$HERE/shim" -I "$R/furi" -I "$R/lib" -I "$R/lib/mlib" -I "$R" \
+    -I "$HERE/../shim" -I "$R/furi" -I "$R/lib" -I "$R/lib/mlib" -I "$R" \
     -I "$R/applications/main/lfrfid/helpers" \
     "$HERE/test_manual_format.c" \
     "$R"/applications/main/lfrfid/helpers/*.c \
