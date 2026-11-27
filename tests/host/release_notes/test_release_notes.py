@@ -65,10 +65,12 @@ class ExtractSection(unittest.TestCase):
     def test_empty_section_is_missing(self):
         self.assertIsNone(release.extract_section("## flpw-001\n\n## flpw-000\n- b\n", "flpw-001"))
 
-    def test_real_changelog_has_unreleased(self):
+    def test_real_changelog(self):
         with open(os.path.join(ROOT, "CHANGELOG.md")) as f:
             text = f.read()
-        out = release.extract_section(text, "Unreleased")
+        # Unreleased is empty right after a release, so check a released section.
+        self.assertRegex(text, r"(?m)^## Unreleased$")
+        out = release.extract_section(text, "flpw-001")
         self.assertIsNotNone(out)
         self.assertIn("### Added", out)
         self.assertNotIn("Momentum's unreleased changelog", out)
