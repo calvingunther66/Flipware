@@ -12,13 +12,13 @@ on:
   workflow_call:
     inputs:
       build-run:
-        description: "Build run to take the firmware from (this run when empty)"
+        description: "ID of the Build run to take the firmware from (this run when empty)"
         type: string
         default: ""
   workflow_dispatch:
     inputs:
       build-run:
-        description: "Build run to take the firmware from (a run number)"
+        description: "ID of the Build run to take the firmware from (the number after /actions/runs/ in its URL, not the run number)"
         type: string
         required: true
 
@@ -51,7 +51,7 @@ jobs:
         run: |
           hash=$(cat .github/emulator/Dockerfile .github/emulator/flipperemu.pin | sha256sum | cut -c1-12)
           owner="${GITHUB_REPOSITORY_OWNER,,}"
-          echo "ref=ghcr.io/${owner}/flipperemu-ci:${hash}" >> "$GITHUB_OUTPUT"
+          echo "ref=ghcr.io/${owner}/flipware-emulator:${hash}" >> "$GITHUB_OUTPUT"
 
       - name: "Log in to the registry"
         env:
@@ -69,7 +69,10 @@ jobs:
           echo "No $IMAGE yet: building FlipperEmu $(cat .github/emulator/flipperemu.pin)."
           docker build --build-arg FLIPPEREMU_REF="$(cat .github/emulator/flipperemu.pin)" \
             -t "$IMAGE" .github/emulator
-          docker push "$IMAGE"
+          if ! docker push "$IMAGE" ; then
+            echo "::error title=Emulator image push denied::Could not push $IMAGE. If the package already exists, give this repository Write access under the package's settings (Manage Actions access), or use another image name in .github/workflows/emulator.yml."
+            exit 1
+          fi
           echo "Built and pushed $IMAGE." >> "$GITHUB_STEP_SUMMARY"
 
   check:
