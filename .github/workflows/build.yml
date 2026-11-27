@@ -99,6 +99,18 @@ jobs:
         run: |
           git diff --exit-code
 
+      # The update folder, zipped, for people who copy it to the SD card by hand.
+      # (fbt itself only makes the .tgz for qFlipper.)
+      - name: "Zip the update folder"
+        run: |
+          set -e
+          update_dir=$(ls -d dist/${TARGET}-*/${TARGET}-update-*/ | head -n1)
+          python3 - "$update_dir" "$(dirname "$update_dir")/flipper-z-${TARGET}-update-${SUFFIX}" <<'PY'
+          import shutil, sys
+          shutil.make_archive(sys.argv[2], "zip", root_dir=sys.argv[1])
+          PY
+          ls -l dist/${TARGET}-*/flipper-z-${TARGET}-update-*
+
       - name: "Upload artifacts to GitHub"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
