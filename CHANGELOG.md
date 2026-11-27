@@ -26,7 +26,11 @@ tag with no section of its own fails the release job.
 
 ## Unreleased
 
+### Added
+- Install guide (`documentation/Install.md`): qFlipper, SD card, moving over from Momentum and from the official firmware, what an update changes, recovery; and `documentation/ReleaseChecklist.md`, the release candidate and device pass every release goes through (#44)
+
 ### Updated
+- Website: a Download button for the latest release and a link to the install guide (#44)
 - Releases: pushing a `flpw-NNN` tag publishes the GitHub release by itself, with the update `.tgz` and `.zip`, the full `.dfu`, the SDK zip, `SHA256SUMS` and the changelog section as notes; `-rcN` tags are pre-releases (#94)
 
 ## flpw-001 - 2026-11-26

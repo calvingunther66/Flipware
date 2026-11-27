@@ -64,7 +64,9 @@ how to install and build, and how to contribute are in the
 
 Download the latest release from the
 [releases page](https://github.com/calvingunther66/Flipware/releases/latest)
-and install it like this:
+and install it like this. The full guide, with moving over from Momentum or the
+official firmware, checking the download and going back, is
+[documentation/Install.md](documentation/Install.md).
 
 > <details><summary><code>qFlipper package (.tgz)</code></summary><ul>
 >   <li>Download the .tgz from the latest release</li>
