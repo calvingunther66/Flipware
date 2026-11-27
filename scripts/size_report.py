@@ -12,6 +12,7 @@ free below the radio stack, and how that compares with an earlier build.
 Exit status is 1 when a gate in the budget file fails, after the report is
 written. Only the Python standard library is used, so it runs anywhere.
 """
+
 import argparse
 import json
 import os
@@ -146,7 +147,9 @@ def parse_radio_address(manifest_text):
         raise ValueError("update.fuf has no 'Radio address' line")
     value = int(match.group(1), 0)
     if value == 0:
-        raise ValueError("update.fuf has radio address 0 (a package without a radio stack)")
+        raise ValueError(
+            "update.fuf has radio address 0 (a package without a radio stack)"
+        )
     return value
 
 
@@ -316,19 +319,26 @@ def render_markdown(current, delta, problems, baseline_note, budget):
     out.append("|---|---|---:|---:|")
     for sec in sorted(current["sections"], key=lambda s: -s["size"]):
         change = _signed(delta["sections"].get(sec["name"], 0)) if delta else "n/a"
-        out.append(f"| `{sec['name']}` | {sec['region']} | {sec['size']:,} | {change} |")
+        out.append(
+            f"| `{sec['name']}` | {sec['region']} | {sec['size']:,} | {change} |"
+        )
     out.append("\n</details>\n")
 
     if delta:
         grown = [c for c in delta["symbols_grown"] if c[3] > 0][:10]
         shrunk = [c for c in delta["symbols_shrunk"] if c[3] < 0][:5]
-        for title, rows in (("Symbols that grew most", grown), ("Symbols that shrank most", shrunk)):
+        for title, rows in (
+            ("Symbols that grew most", grown),
+            ("Symbols that shrank most", shrunk),
+        ):
             out.append(f"<details><summary>{title}</summary>\n")
             if rows:
                 out.append("| Symbol | Before | After | Change |")
                 out.append("|---|---:|---:|---:|")
                 for name, was, now, change in rows:
-                    out.append(f"| {_code(name)} | {was:,} | {now:,} | {_signed(change)} |")
+                    out.append(
+                        f"| {_code(name)} | {was:,} | {now:,} | {_signed(change)} |"
+                    )
             else:
                 out.append("None.")
             out.append("\n</details>\n")
@@ -347,7 +357,9 @@ def main(argv=None):
     parser.add_argument("--budget", required=True)
     parser.add_argument("--baseline", help="size JSON of an earlier build")
     parser.add_argument(
-        "--baseline-note", default="the earlier build", help="what the baseline is, for the report"
+        "--baseline-note",
+        default="the earlier build",
+        help="what the baseline is, for the report",
     )
     parser.add_argument("--growth-allowed", action="store_true")
     parser.add_argument("--target", default="f7")
