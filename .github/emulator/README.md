@@ -14,6 +14,7 @@ with the Flipper Zero board), and runs these checks, each in its own job with a
 | `emulator / emulator (ble)` | `scripts/ble_check.py` | the radio stack starts, a phone pairs, RPC over BLE |
 | `emulator / emulator (uart)` | `scripts/uart_check.py` | the header's serial ports and the expansion link |
 | `emulator / emulator (lock)` | `scripts/lock_check.py` | a module on the expansion port cannot unlock a PIN-locked Flipper |
+| `emulator / emulator (fwbugs)` | `scripts/fwbugs_check.py` | the storage RPC, the ISO14443-3B dump and the NFC app's exit survive the inputs that used to crash them (FW-01, FW-02, FW-06; its FW-04/19 fuzz run is off until FW-05 is fixed; see `documentation/FirmwareBugTriage.md`) |
 
 Make a job a required check in the `dev` ruleset only after several green runs, and
 use the name in the table exactly: a required name that never reports blocks every pull

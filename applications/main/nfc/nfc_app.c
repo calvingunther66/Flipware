@@ -147,6 +147,16 @@ void nfc_app_free(NfcApp* instance) {
         rpc_system_app_set_callback(instance->rpc_ctx, NULL, NULL);
     }
 
+    // The loader can close the app in the middle of a scan, a read or an emulation. The view
+    // dispatcher stops where it is, without the scene's Back handling, and nfc_free() checks
+    // that nothing is using the NFC chip any more.
+    scene_manager_stop(instance->scene_manager);
+    if(instance->poller) {
+        nfc_poller_stop(instance->poller);
+        nfc_poller_free(instance->poller);
+        instance->poller = NULL;
+    }
+
     nfc_free(instance->nfc);
 
     nfc_detected_protocols_free(instance->detected_protocols);

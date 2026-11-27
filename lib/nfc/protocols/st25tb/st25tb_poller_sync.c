@@ -50,6 +50,9 @@ static St25tbError st25tb_poller_detect_handler(St25tbPoller* poller, St25tbPoll
     St25tbError error = st25tb_poller_get_uid(poller, uid);
     if(error == St25tbErrorNone) {
         *data->detect_type.type = st25tb_get_type_from_uid(uid);
+        if(*data->detect_type.type == St25tbTypeNum) {
+            error = St25tbErrorNotPresent;
+        }
     }
     return error;
 }

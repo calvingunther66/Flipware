@@ -505,6 +505,60 @@ MfDesfireError mf_desfire_poller_read_file_records(
         instance, id, MF_DESFIRE_CMD_READ_RECORDS, offset, size, data);
 }
 
+// A record file is read by its number of records, not by bytes: ReadRecords takes the number of
+// the first record and how many to read, and the answer is that many whole records.
+static MfDesfireError mf_desfire_poller_read_records(
+    MfDesfirePoller* instance,
+    MfDesfireFileId id,
+    size_t record_size,
+    uint32_t record_count,
+    MfDesfireFileData* data) {
+    furi_check(instance);
+    furi_check(data);
+
+    MfDesfireError error = MfDesfireErrorNone;
+    simple_array_init(data->data, record_size * record_count);
+    if(record_size == 0 || record_count == 0) return error;
+
+    const size_t buffer_capacity = bit_buffer_get_capacity_bytes(instance->result_buffer);
+    const uint32_t records_per_chunk = MAX((uint32_t)1, (uint32_t)(buffer_capacity / record_size));
+    uint32_t records_read = 0;
+
+    while(records_read < record_count) {
+        const uint32_t records_to_read = MIN(records_per_chunk, record_count - records_read);
+        bit_buffer_reset(instance->input_buffer);
+        bit_buffer_append_byte(instance->input_buffer, MF_DESFIRE_CMD_READ_RECORDS);
+        bit_buffer_append_byte(instance->input_buffer, id);
+        bit_buffer_append_bytes(instance->input_buffer, (const uint8_t*)&records_read, 3);
+        bit_buffer_append_bytes(instance->input_buffer, (const uint8_t*)&records_to_read, 3);
+
+        error = mf_desfire_poller_send_chunks(
+            instance, instance->input_buffer, instance->result_buffer);
+        if(error != MfDesfireErrorNone) break;
+
+        const size_t bytes_to_read = (size_t)records_to_read * record_size;
+        const size_t bytes_received = bit_buffer_get_size_bytes(instance->result_buffer);
+        if(bytes_received != bytes_to_read) {
+            FURI_LOG_W(TAG, "Read %zu out of %zu bytes", bytes_received, bytes_to_read);
+            error = MfDesfireErrorProtocol;
+            break;
+        }
+
+        uint8_t* file_data = simple_array_get_data(data->data);
+        bit_buffer_write_bytes(
+            instance->result_buffer,
+            &file_data[(size_t)records_read * record_size],
+            bytes_to_read);
+        records_read += records_to_read;
+    }
+
+    if(error != MfDesfireErrorNone) {
+        simple_array_reset(data->data);
+    }
+
+    return error;
+}
+
 MfDesfireError mf_desfire_poller_read_file_data_multi(
     MfDesfirePoller* instance,
     const SimpleArray* file_ids,
@@ -550,8 +604,12 @@ MfDesfireError mf_desfire_poller_read_file_data_multi(
         } else if(
             file_type == MfDesfireFileTypeLinearRecord ||
             file_type == MfDesfireFileTypeCyclicRecord) {
-            error = mf_desfire_poller_read_file_records(
-                instance, file_id, 0, file_settings_cur->record.size, file_data);
+            error = mf_desfire_poller_read_records(
+                instance,
+                file_id,
+                file_settings_cur->record.size,
+                file_settings_cur->record.cur,
+                file_data);
         }
     }
 

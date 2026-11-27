@@ -247,7 +247,11 @@ static void cli_vcp_message_received(FuriEventLoopObject* object, void* context)
 
         // switch usb mode
         cli_vcp->previous_interface = furi_hal_usb_get_config();
-        furi_hal_usb_set_config(&usb_cdc_single, NULL);
+        // Do not take the second port away from the USB-UART bridge on channel 1, which set
+        // the two-port configuration just before it enabled the CLI.
+        if(cli_vcp->previous_interface != &usb_cdc_dual) {
+            furi_hal_usb_set_config(&usb_cdc_single, NULL);
+        }
         furi_hal_cdc_set_callbacks(VCP_IF_NUM, &cdc_callbacks, cli_vcp);
         break;
     }

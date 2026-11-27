@@ -263,8 +263,8 @@ bool protocol_securakey_encoder_start(ProtocolSecurakey* protocol) {
             }
             // write facility number (f)
             bit_lib_copy_bits(protocol->RKKT_encoded_data, 30, 7, protocol->data, 2);
-            // have to skip one spacer
-            bit_lib_copy_bits(protocol->RKKT_encoded_data, 38, 7, protocol->data, 3);
+            // have to skip one spacer (data bit 9, as the decoder and the 26-bit encoder have it)
+            bit_lib_copy_bits(protocol->RKKT_encoded_data, 38, 7, protocol->data, 9);
         }
 
         // write card number (c)

@@ -513,7 +513,7 @@ uint32_t furi_thread_flags_set(FuriThreadId thread_id, uint32_t flags) {
 
 uint32_t furi_thread_flags_clear(uint32_t flags) {
     TaskHandle_t hTask;
-    uint32_t rflags, cflags;
+    uint32_t rflags;
 
     if(FURI_IS_IRQ_MODE()) {
         rflags = (uint32_t)FuriStatusErrorISR;
@@ -522,18 +522,9 @@ uint32_t furi_thread_flags_clear(uint32_t flags) {
     } else {
         hTask = xTaskGetCurrentTaskHandle();
 
-        if(xTaskNotifyAndQueryIndexed(hTask, THREAD_NOTIFY_INDEX, 0, eNoAction, &cflags) ==
-           pdPASS) {
-            rflags = cflags;
-            cflags &= ~flags;
-
-            if(xTaskNotifyIndexed(hTask, THREAD_NOTIFY_INDEX, cflags, eSetValueWithOverwrite) !=
-               pdPASS) {
-                rflags = (uint32_t)FuriStatusError;
-            }
-        } else {
-            rflags = (uint32_t)FuriStatusError;
-        }
+        // One critical section: read the flags and clear the bits together. A read followed by
+        // a write back lost a flag that an interrupt set in between.
+        rflags = ulTaskNotifyValueClearIndexed(hTask, THREAD_NOTIFY_INDEX, flags);
     }
 
     /* Return flags before clearing */
