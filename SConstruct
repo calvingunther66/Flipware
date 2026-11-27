@@ -415,6 +415,42 @@ distenv.PhonyTarget(
     IMG_LINT_SOURCES=firmware_env["IMG_LINT_SOURCES"],
 )
 
+
+# Host tests: tests/host/*/run.sh built with the PC compiler, no firmware build or device.
+# ./fbt puts its bundled toolchain (and its Python, which has no user site packages) first
+# in PATH. The tests are meant for the host's own gcc and Python (host_auth needs the
+# `cryptography` package), so run them with the toolchain's PATH entries and Python
+# variables taken out. PYTHON, if set, still overrides the interpreter.
+def _host_test_command():
+    toolchain_dirs = [
+        os.path.realpath(os.path.join(d, "toolchain"))
+        for d in (os.environ.get("FBT_TOOLCHAIN_PATH", ""), Dir("#").abspath)
+        if d
+    ]
+    host_path = os.pathsep.join(
+        entry
+        for entry in os.environ.get("PATH", "").split(os.pathsep)
+        if not any(
+            os.path.realpath(entry) == t
+            or os.path.realpath(entry).startswith(t + os.sep)
+            for t in toolchain_dirs
+        )
+    )
+    return [
+        "env",
+        f"PATH={host_path}",
+        # fbtenv saves the caller's values in SAVED_* and blanks the originals
+        f"PYTHONNOUSERSITE={os.environ.get('SAVED_PYTHONNOUSERSITE', '')}",
+        f"PYTHONPATH={os.environ.get('SAVED_PYTHONPATH', '')}",
+        f"PYTHONHOME={os.environ.get('SAVED_PYTHONHOME', '')}",
+        "bash",
+        "${ROOT_DIR.abspath}/tests/host/run.sh",
+        "${ARGS}",
+    ]
+
+
+distenv.PhonyTarget("test_host", [_host_test_command()])
+
 distenv.Alias("lint_all", ["lint", "lint_py", "lint_img"])
 distenv.Alias("format_all", ["format", "format_py", "format_img"])
 

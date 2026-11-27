@@ -26,6 +26,9 @@ tag with no section of its own fails the release job.
 
 ## Unreleased
 
+### Added
+- Build: host tests for the host sign-in code, the 125 kHz RFID Add Manually formats, Sub-GHz capture compare and release notes now run in CI on every pull request, and locally with `./fbt test_host` (#40)
+
 ### Updated
 - Releases: pushing a `flpw-NNN` tag publishes the GitHub release by itself, with the update `.tgz` and `.zip`, the full `.dfu`, the SDK zip, `SHA256SUMS` and the changelog section as notes; `-rcN` tags are pre-releases (#94)
 
