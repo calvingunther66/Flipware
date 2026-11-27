@@ -26,7 +26,12 @@ tag with no section of its own fails the release job.
 
 ## Unreleased
 
+### Added
+- Build: host tests for the host sign-in code, the 125 kHz RFID Add Manually formats, Sub-GHz capture compare and release notes now run in CI on every pull request, and locally with `./fbt test_host` (#40)
+
 ### Updated
+- CI: every Build now boots the firmware in the FlipperEmu emulator and runs its checks: boot and radios, an update install, the VGM coprocessor, BLE pairing, the serial ports and the PIN lock. A pull request that breaks one of them turns red, with the device's logs and screenshots attached (#97)
+- CI: every Build writes a flash and RAM report (image size, free flash below the radio stack, `.data` and `.bss`, change against `dev`, symbols that grew most) as a job summary and a pull request comment, and fails when free flash drops below the budget or a PR grows the image by more than 512 bytes without the `flash-budget` label (#96)
 - Releases: pushing a `flpw-NNN` tag publishes the GitHub release by itself, with the update `.tgz` and `.zip`, the full `.dfu`, the SDK zip, `SHA256SUMS` and the changelog section as notes; `-rcN` tags are pre-releases (#94)
 
 ## flpw-001 - 2026-11-26
