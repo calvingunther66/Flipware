@@ -114,7 +114,11 @@ jobs:
           echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           docker pull --quiet "$IMAGE"
 
+      # The step limit is longer than run-check.sh's own (11 minutes) and shorter
+      # than the job's, so a hung check is stopped by the script, which still
+      # packages the device logs, and the failure artifact is uploaded.
       - name: "Run the check"
+        timeout-minutes: 13
         env:
           IMAGE: ${{ needs.image.outputs.ref }}
         run: |

@@ -1,7 +1,7 @@
 # Emulator checks in CI
 
-Every Build run that is not for a tag ends with the **Emulator checks** workflow
-([emulator.yml](../workflows/emulator.yml)). It takes the update package that Build
+Every Build run that is not for a tag, and not for a pull request from a fork, ends with
+the **Emulator checks** workflow ([emulator.yml](../workflows/emulator.yml)). It takes the update package that Build
 made, starts it in [FlipperEmu](https://github.com/calvingunther66/FlipperEmu) (QEMU
 with the Flipper Zero board), and runs these checks, each in its own job with a
 15 minute limit:
