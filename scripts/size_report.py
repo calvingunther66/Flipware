@@ -329,7 +329,7 @@ def render_markdown(current, delta, problems, baseline_note, budget):
     for sec in sorted(current["sections"], key=lambda s: -s["size"]):
         change = _signed(delta["sections"].get(sec["name"], 0)) if delta else "n/a"
         out.append(
-            f"| `{sec['name']}` | {sec['region']} | {sec['size']:,} | {change} |"
+            f"| {_code(sec['name'])} | {sec['region']} | {sec['size']:,} | {change} |"
         )
     out.append("\n</details>\n")
 

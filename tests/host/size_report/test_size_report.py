@@ -252,6 +252,25 @@ class Markdown(unittest.TestCase):
         self.assertEqual(code.count("`"), 2)
         self.assertLessEqual(len(size_report._code("a" * 500)), 84)
 
+    def test_section_names_cannot_break_out_of_the_table(self):
+        evil = ".x` | [link](http://evil) |\n@someone `"
+        current = {
+            "target": "f7",
+            "image_size": 1,
+            "free_flash": 1,
+            "free_pages": 0,
+            "data": 1,
+            "bss": 1,
+            "heap": None,
+            "sections": [{"name": evil, "region": "flash", "size": 1}],
+            "symbols": [],
+        }
+        md = size_report.render_markdown(current, None, [], "nothing", {})
+        rows = [line for line in md.splitlines() if "link" in line]
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0].startswith("| `"))
+        self.assertEqual(rows[0].count("|"), 5)
+
 
 class Gates(unittest.TestCase):
     BUDGET = {"min_free_flash_bytes": 1000, "max_growth_bytes": 512, "label": "flash-budget"}
