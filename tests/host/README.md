@@ -10,6 +10,7 @@ and runs one test; a non-zero exit means it failed.
 | `lfrfid_manual_format` | 125 kHz RFID "Add Manually" formats and the protocols behind them |
 | `subghz_compare` | Sub-GHz capture compare (the test source sits in `applications/main/subghz/helpers/tests/`) |
 | `release_notes` | Release notes are read from the tag's `CHANGELOG.md` section only |
+| `size_report` | `scripts/size_report.py`: ELF section and symbol sizes, radio address, comparison with the last build, and the free-flash and growth gates |
 
 Run them all with `./fbt test_host` (`ARGS="host_auth"` for one) or
 `tests/host/run.sh [name...]`. Needs `gcc`, Python 3 with `cryptography`
