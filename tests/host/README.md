@@ -15,7 +15,11 @@ Run them all with `./fbt test_host` (`ARGS="host_auth"` for one) or
 `tests/host/run.sh [name...]`. Needs `gcc`, Python 3 with `cryptography`
 (`fido2` too if you want the host sign-in client data cross-check; point `PYTHON` at
 that interpreter), and the submodules `lib/mbedtls` and `lib/mlib`.
-CI: `.github/workflows/host-tests.yml`.
+CI: `.github/workflows/host-tests.yml`. The check reports as **`host-tests`** (the job
+id, not the workflow name). To make it a required check, use exactly that name in the
+`dev` ruleset, and change the ruleset together with the job id if the job is ever renamed.
+Its Python packages are pinned (`cryptography>=42,<51`, `fido2>=2.2,<3`) to the versions
+the tests were run with.
 
 ## Adding a test
 

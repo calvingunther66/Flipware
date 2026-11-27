@@ -9,6 +9,11 @@ shim's `furi.h`, `core/check.h`, `core/common_defines.h`, `core/log.h` and
 `core/memmgr.h` replace the firmware's; `core/string.h` and the rest still come
 from `furi/`.
 
+Because the shim comes first, its `core/common_defines.h` stands in for the real one
+and has only the macros the current tests use (`UNUSED`, `COUNT_OF`, `MIN`, `MAX`,
+`FURI_PACKED`). If a new test fails on a missing macro such as `FURI_BIT`, `CLAMP` or
+`FURI_ALWAYS_INLINE`, add it to the shim's `core/common_defines.h`.
+
 - `furi_check`, `furi_assert` and `furi_crash` print the location and `abort()`.
 - `FURI_LOG_*` compile to nothing.
 - `malloc` zeroes memory, as furi's does.

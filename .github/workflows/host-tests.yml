@@ -35,11 +35,13 @@ jobs:
         run: git submodule update --init --depth 1 lib/mbedtls lib/mlib
 
       # fido2 lets the host sign-in test cross-check its client data JSON against
-      # the library the Windows and Linux clients use.
+      # the library the Windows and Linux clients use. scripts/hostauth-fido2 is written
+      # against the fido2 2.x API: keep the bounds to versions the tests were run with, so a
+      # new major release cannot turn every pull request red on its own.
       - name: "Install Python packages"
         run: |
           python3 -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/pip" install --quiet cryptography fido2
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet "cryptography>=42,<51" "fido2>=2.2,<3"
 
       - name: "Run host tests"
         env:
