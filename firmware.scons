@@ -109,6 +109,19 @@ env.ConfigureForTarget(env.subst("${TARGET_HW}"))
 # get it, so it has to be set before the modules are built. Fat objects keep
 # ar/ranlib working; the LTO bytecode in them is what the linker plugin uses.
 if env["COMPACT"] and env["IS_BASE_FIRMWARE"]:
+    env.Replace(
+        # Libraries that external apps link in (fap_libs), see ApplyLibFlags.
+        NO_LTO_LIBS=(
+            "u8g2",
+            "music_worker",
+            "infrared",
+            "assets",
+            "toolbox",
+            "hwdrivers",
+            "mbedtls",
+            "ble_profile",
+        ),
+    )
     env.Append(
         CCFLAGS=["-flto", "-ffat-lto-objects"],
         LINKFLAGS=["-flto", "-fuse-linker-plugin"]

@@ -127,6 +127,11 @@ def ApplyLibFlags(env):
     )
     # print("Flags for ", env.get("FW_LIB_NAME", "Default"), flags_to_apply)
     env.MergeFlags(flags_to_apply)
+    # Libraries that external apps link into themselves (fap_libs) have to stay
+    # plain object code: the apps are linked with -Ur, which can't take LTO objects.
+    if env.get("FW_LIB_NAME") in env.get("NO_LTO_LIBS", ()):
+        lto_flags = ("-flto", "-ffat-lto-objects", "-fuse-linker-plugin")
+        env.Replace(CCFLAGS=[f for f in env["CCFLAGS"] if f not in lto_flags])
 
 
 def generate(env):
