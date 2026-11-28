@@ -7,7 +7,8 @@ Flash is counted per input section: everything the linker placed in flash, plus
 the initial values of .data (placed in RAM, stored in flash). Each input section
 is charged to the object file it came from, and objects are grouped by the
 static library they sit in (libnfc.a) or, for loose object files, by their
-first two directories. Only the Python standard library is used.
+first two directories (three under applications/). Only the Python standard
+library is used.
 
 `--why SYMBOL` reads the cross reference table (the link has to use
 -Wl,--cref) and prints which file defines the symbol and which files use it.

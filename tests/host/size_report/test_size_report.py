@@ -8,6 +8,7 @@ import os
 import struct
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
@@ -455,10 +456,45 @@ Linker script and memory map
         self.assertIn("Flash by library or directory", md)
         self.assertIn("`libnfc.a`", md)
         self.assertIn("+160", md)
+        # a library that is gone still shows, at 0 B
+        gone = dict(base)
+        size_report.add_map(gone, lines)
+        gone["flash_groups"] = dict(gone["flash_groups"], **{"libgone.a": 5000})
+        md = size_report.render_markdown(now, size_report.compare(now, gone), [], "x", {})
+        self.assertIn("`libgone.a` | 0 |", md)
+        self.assertIn("-5,000", md)
         # a baseline from before the map existed gives "n/a", not a huge change
         old = {k: v for k, v in base.items() if k != "flash_groups"}
         md = size_report.render_markdown(now, size_report.compare(now, old), [], "x", {})
         self.assertNotIn("+768", md)
+
+
+class MapGuardTest(unittest.TestCase):
+    def test_gap_warning(self):
+        report = {"flash_map_check": {"map": 1_250_000, "elf": 880_000}}
+        self.assertIn("probably", size_report.map_gap_warning(report))
+        report = {"flash_map_check": {"map": 890_000, "elf": 880_000}}
+        self.assertIsNone(size_report.map_gap_warning(report))
+        self.assertIsNone(size_report.map_gap_warning({}))
+
+    def test_bad_map_does_not_fail_the_report(self):
+        with tempfile.TemporaryDirectory() as d:
+            elf = os.path.join(d, "fw.elf")
+            write(elf, make_elf(800_000, 70_000, 900, 5_000, SYMBOLS))
+            upd = update_dir(d)
+            budget = os.path.join(d, "budget.json")
+            write(budget, json.dumps({"min_free_flash_bytes": 0, "max_growth_bytes": 0}), "w")
+            bad = os.path.join(d, "map")
+            write(bad, b"Linker script and memory map\n.text 0xZZ\n")
+            out_json, out_md = os.path.join(d, "o.json"), os.path.join(d, "o.md")
+            with mock.patch.object(size_report.linkmap, "parse_map", side_effect=ValueError("boom")):
+                code = size_report.main(
+                    ["--elf", elf, "--update-dir", upd, "--budget", budget,
+                     "--map", bad, "--out-json", out_json, "--out-md", out_md]
+                )
+            self.assertEqual(code, 0)
+            self.assertTrue(os.path.exists(out_md))
+            self.assertNotIn("flash_groups", json.load(open(out_json)))
 
 
 if __name__ == "__main__":
