@@ -10,7 +10,17 @@ env.Append(
 libenv = env.Clone(FW_LIB_NAME="furi")
 libenv.ApplyLibFlags()
 
-sources = libenv.GlobRecursive("*.c")
+sources = []
+for src in libenv.GlobRecursive("*.c"):
+    if src.name == "check.c":
+        # Its inline asm loads addresses with `ldr rX, =symbol`, which needs a
+        # literal pool right behind the function. Link-time optimization moves the
+        # pool away and the assembler fails with "offset out of range".
+        sources.append(
+            libenv.StaticObject(src, CCFLAGS=libenv["CCFLAGS"] + ["-fno-lto"])
+        )
+    else:
+        sources.append(src)
 
 lib = libenv.StaticLibrary("${FW_LIB_NAME}", sources)
 libenv.Install("${LIB_DIST_DIR}", lib)
