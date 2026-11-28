@@ -12,8 +12,9 @@ GitHub labelled `roadmap` and a matching
 [milestone](https://github.com/calvingunther66/Flipware/milestones?direction=asc&sort=due_date),
 and every epic is a sub-issue of its stage, so work can be picked up one issue
 (and one branch) at a time. The maintainer's "Flipware Roadmap" GitHub
-Project shows the same issues as a timeline, grouped by stage. A stage ends when
-its exit criteria are met, not on a date.
+Project shows the same issues as a timeline, grouped by stage. Target dates, if
+there are any, live on that board and in the issues; this document doesn't carry
+them. A stage ends when its exit criteria are met.
 
 - [Where Flipware stands today](#where-flipware-stands-today)
 - [Principles](#principles)
@@ -119,9 +120,9 @@ Priorities used below: **Must** (the stage doesn't ship without it),
 
 Tracking issue: [#25](https://github.com/calvingunther66/Flipware/issues/25)
 
-Close the one security gap found, make
-the public claims match the code, and replace what Flipware inherited but
-doesn't use. Nothing here needs new hardware.
+Close the one security gap found, make the public claims match the code, and
+replace what Flipware inherited but doesn't use. Nothing here needs new
+hardware.
 
 ### 0.1 Close the expansion port while the PIN lock is on · Must
 
@@ -218,9 +219,8 @@ changelog exists.
 
 Tracking issue: [#26](https://github.com/calvingunther66/Flipware/issues/26)
 
-*Ships `flpw-001`.* Build
-the safety net (size gate, host tests, emulator tests), burn down known bugs,
-and publish the first release.
+*Ships `flpw-001`.* Build the safety net (size gate, host tests, emulator
+tests), burn down known bugs, and publish the first release.
 
 ### 1.1 A working release pipeline · Must
 
@@ -356,9 +356,9 @@ host tests and emulator checks.
 
 Tracking issue: [#27](https://github.com/calvingunther66/Flipware/issues/27)
 
-*Ships `flpw-002`.* Settle how
-Flipware stands on its own after the split from Momentum, then make room.
-Almost everything after this stage needs flash or RAM that doesn't exist today.
+*Ships `flpw-002`.* Settle how Flipware stands on its own after the split from
+Momentum, then make room. Almost everything after this stage needs flash or
+RAM that doesn't exist today.
 
 ### 2.1 Independence from upstream · Must
 
@@ -450,9 +450,8 @@ Issue: [#49](https://github.com/calvingunther66/Flipware/issues/49)
   50-signal capture without an out-of-memory reboot. The changelog quotes
   about 50 signals normally and about 10 with qFlipper.
 
-**Stage 2 exit:** the independence note is merged, there are at least 48 KiB
-(12 pages) of free flash after it, the RAM targets are met, and `flpw-002` is
-released.
+**Stage 2 exit:** there are at least 48 KiB (12 pages) of free flash, the RAM
+targets are met, and `flpw-002` is released.
 
 ---
 
@@ -460,9 +459,9 @@ released.
 
 Tracking issue: [#28](https://github.com/calvingunther66/Flipware/issues/28)
 
-*Ships `flpw-003` and Flipware VGM firmware 1.0.* This turns the VGM from a screen mirror into Flipware's
-signature feature: a desktop on HDMI and over USB, and a coprocessor and
-bus expander that apps can use.
+*Ships `flpw-003` and Flipware VGM firmware 1.0.* This turns the VGM from a
+screen mirror into Flipware's signature feature: a desktop on HDMI and over
+USB, and a coprocessor and bus expander that apps can use.
 
 ### 3.1 A home and a release for the VGM firmware · Must
 
@@ -586,9 +585,8 @@ documented and tested in the emulator and on a VGM.
 
 Tracking issue: [#29](https://github.com/calvingunther66/Flipware/issues/29)
 
-*Ships `flpw-004`.* Workflow
-improvements every user notices, built mostly as SD apps and plugins so they
-stay within the flash budget.
+*Ships `flpw-004`.* Workflow improvements every user notices, built mostly as
+SD apps and plugins so they stay within the flash budget.
 
 ### 4.1 Sub-GHz · Must
 
@@ -678,8 +676,8 @@ check, and `flpw-004` is released.
 
 Tracking issue: [#30](https://github.com/calvingunther66/Flipware/issues/30)
 
-*Ships `flpw-005`.* Updates without
-a computer, USB that does two things at once, and steadier Bluetooth.
+*Ships `flpw-005`.* Updates without a computer, USB that does two things at
+once, and steadier Bluetooth.
 
 ### 5.1 Updates and time over Wi-Fi · Must
 
@@ -750,8 +748,7 @@ release; the CLI survives HID use; `flpw-005` is released.
 
 Tracking issue: [#31](https://github.com/calvingunther66/Flipware/issues/31)
 
-*Ships `flpw-006`.* Make
-Flipware easy to build on.
+*Ships `flpw-006`.* Make Flipware easy to build on.
 
 ### 6.1 A Flipware JS SDK · Must
 
@@ -860,8 +857,8 @@ app can get CI with emulator runs from the template, docs are online, and
 
 Tracking issue: [#32](https://github.com/calvingunther66/Flipware/issues/32)
 
-*Each epic starts when its gate opens.* Research-sized work that gets
-more out of the STM32WB55 and the modules.
+*Each epic starts when its gate opens.* Research-sized work that gets more out
+of the STM32WB55 and the modules.
 
 ### 7.1 Hardware public-key crypto · Could
 
