@@ -9,11 +9,11 @@
 
 #define TAG "SubGhzPlugins"
 
-#define SUBGHZ_PLUGINS_PATH_FORMAT APP_ASSETS_PATH("plugins/%s")
+#define SUBGHZ_PLUGINS_PATH_FORMAT        APP_ASSETS_PATH("plugins/%s")
 // One bundle id per line; bundles listed there are never loaded (saves RAM)
-#define SUBGHZ_PLUGINS_DISABLED_FILE EXT_PATH("subghz/assets/disabled_plugins.txt")
+#define SUBGHZ_PLUGINS_DISABLED_FILE      EXT_PATH("subghz/assets/disabled_plugins.txt")
 // Free heap that has to be left after a bundle is loaded, so the app and the radio keep working
-#define SUBGHZ_PLUGINS_HEAP_RESERVE (16 * 1024)
+#define SUBGHZ_PLUGINS_HEAP_RESERVE       (16 * 1024)
 // A loaded .fal takes about its file size plus the relocation work space
 #define SUBGHZ_PLUGINS_HEAP_PER_FILE_BYTE 2
 
@@ -109,7 +109,11 @@ static bool subghz_plugins_fits_in_heap(const char* path) {
     size_t need = info.size * SUBGHZ_PLUGINS_HEAP_PER_FILE_BYTE + SUBGHZ_PLUGINS_HEAP_RESERVE;
     if(memmgr_get_free_heap() < need) {
         FURI_LOG_W(
-            TAG, "Not enough memory for %s: %zu free, %zu needed", path, memmgr_get_free_heap(), need);
+            TAG,
+            "Not enough memory for %s: %zu free, %zu needed",
+            path,
+            memmgr_get_free_heap(),
+            need);
         return false;
     }
     return true;
@@ -126,7 +130,9 @@ static bool subghz_plugins_load_slot(SubGhzPlugins* instance, size_t index) {
         if(!subghz_plugins_fits_in_heap(furi_string_get_cstr(path))) break;
 
         slot->manager = plugin_manager_alloc(
-            SUBGHZ_PROTOCOL_PLUGIN_APP_ID, SUBGHZ_PROTOCOL_PLUGIN_API_VERSION, firmware_api_interface);
+            SUBGHZ_PROTOCOL_PLUGIN_APP_ID,
+            SUBGHZ_PROTOCOL_PLUGIN_API_VERSION,
+            firmware_api_interface);
         PluginManagerError error =
             plugin_manager_load_single(slot->manager, furi_string_get_cstr(path));
         if(error != PluginManagerErrorNone) {
@@ -186,8 +192,8 @@ void subghz_plugins_free(SubGhzPlugins* instance) {
 SubGhzPluginsModulation subghz_plugins_modulation_for_preset(const char* preset_name) {
     // Built-in presets are AM270, AM650, FM238, FM476, FM12K. Custom ones in setting_user are
     // named after their modulation, 2FSK/GFSK/MSK being frequency modulated.
-    if(preset_name && (strstr(preset_name, "FM") || strstr(preset_name, "FSK") ||
-                       strstr(preset_name, "MSK"))) {
+    if(preset_name &&
+       (strstr(preset_name, "FM") || strstr(preset_name, "FSK") || strstr(preset_name, "MSK"))) {
         return SubGhzPluginsModulationFM;
     }
     return SubGhzPluginsModulationAM;
@@ -195,9 +201,8 @@ SubGhzPluginsModulation subghz_plugins_modulation_for_preset(const char* preset_
 
 bool subghz_plugins_select(SubGhzPlugins* instance, SubGhzPluginsModulation modulation) {
     furi_check(instance);
-    const SubGhzProtocolFlag wanted_flag = modulation == SubGhzPluginsModulationFM ?
-                                               SubGhzProtocolFlag_FM :
-                                               SubGhzProtocolFlag_AM;
+    const SubGhzProtocolFlag wanted_flag =
+        modulation == SubGhzPluginsModulationFM ? SubGhzProtocolFlag_FM : SubGhzProtocolFlag_AM;
     bool changed = false;
     instance->skipped = 0;
 

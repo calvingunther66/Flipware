@@ -1018,7 +1018,8 @@ static bool subghz_test_plugin_has_protocol(SubGhzTestPluginSet* set, const char
 }
 
 // Feeds a RAW capture to every decoder and reports whether `name` decoded it
-static bool subghz_test_plugin_decode(SubGhzTestPluginSet* set, const char* path, const char* name) {
+static bool
+    subghz_test_plugin_decode(SubGhzTestPluginSet* set, const char* path, const char* name) {
     set->expect_name = name;
     set->expect_count = 0;
     set->other_count = 0;
@@ -1045,8 +1046,7 @@ static bool subghz_test_plugin_decode(SubGhzTestPluginSet* set, const char* path
         subghz_file_encoder_worker_stop(worker);
     }
     subghz_file_encoder_worker_free(worker);
-    FURI_LOG_D(
-        TAG, "%s: %d decoded, %d by others", name, set->expect_count, set->other_count);
+    FURI_LOG_D(TAG, "%s: %d decoded, %d by others", name, set->expect_count, set->other_count);
     return set->expect_count > 0;
 }
 
@@ -1055,12 +1055,12 @@ MU_TEST(subghz_plugins_decoders_test) {
 
     // Every one of the 29 decoders is there, plus the firmware ones
     static const char* const names[] = {
-        "inFactory-TH",   "ThermoPRO-TX4", "Nexus-TH",       "GT-WT02",        "GT-WT03",
-        "Acurite-606TX",  "Acurite-609TXC", "Acurite-986",   "Bresser-3CH",    "LaCrosse_TX",
-        "TX141THBv2",     "Oregon2",       "Oregon3",        "Acurite 592TXR", "Ambient_Weather",
-        "Solight TE44",   "Auriol HG06061", "Oregon-v1",     "TX8300",         "Wendox W6726",
-        "Auriol AHFL",    "Kedsum-TH",     "EMOS E601x",     "Acurite 5n1",    "Vauno-EN8822C",
-        "Schrader GG4",   "POCSAG",        "X10",            "Hormann BiSecur",
+        "inFactory-TH",  "ThermoPRO-TX4",  "Nexus-TH",    "GT-WT02",         "GT-WT03",
+        "Acurite-606TX", "Acurite-609TXC", "Acurite-986", "Bresser-3CH",     "LaCrosse_TX",
+        "TX141THBv2",    "Oregon2",        "Oregon3",     "Acurite 592TXR",  "Ambient_Weather",
+        "Solight TE44",  "Auriol HG06061", "Oregon-v1",   "TX8300",          "Wendox W6726",
+        "Auriol AHFL",   "Kedsum-TH",      "EMOS E601x",  "Acurite 5n1",     "Vauno-EN8822C",
+        "Schrader GG4",  "POCSAG",         "X10",         "Hormann BiSecur",
     };
     for(size_t i = 0; i < COUNT_OF(names); i++) {
         mu_assert(subghz_test_plugin_has_protocol(set, names[i]), names[i]);

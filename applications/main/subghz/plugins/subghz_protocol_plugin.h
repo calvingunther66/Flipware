@@ -32,19 +32,19 @@ typedef struct {
  * @param ep_name Entry point name; must match `entry_point` in application.fam
  * @param ... Pointers to the SubGhzProtocol structs of the bundle, in feed order
  */
-#define SUBGHZ_PROTOCOL_PLUGIN_DEFINE(ep_name, ...)                                      \
-    static const SubGhzProtocol* const ep_name##_items[] = {__VA_ARGS__};                \
-    static const SubGhzProtocolPlugin ep_name##_plugin = {                               \
-        .items = ep_name##_items,                                                        \
-        .count = sizeof(ep_name##_items) / sizeof(ep_name##_items[0]),                   \
-    };                                                                                   \
-    static const FlipperAppPluginDescriptor ep_name##_descriptor = {                     \
-        .appid = SUBGHZ_PROTOCOL_PLUGIN_APP_ID,                                          \
-        .ep_api_version = SUBGHZ_PROTOCOL_PLUGIN_API_VERSION,                            \
-        .entry_point = &ep_name##_plugin,                                                \
-    };                                                                                   \
-    const FlipperAppPluginDescriptor* ep_name(void) {                                    \
-        return &ep_name##_descriptor;                                                    \
+#define SUBGHZ_PROTOCOL_PLUGIN_DEFINE(ep_name, ...)                       \
+    static const SubGhzProtocol* const ep_name##_items[] = {__VA_ARGS__}; \
+    static const SubGhzProtocolPlugin ep_name##_plugin = {                \
+        .items = ep_name##_items,                                         \
+        .count = sizeof(ep_name##_items) / sizeof(ep_name##_items[0]),    \
+    };                                                                    \
+    static const FlipperAppPluginDescriptor ep_name##_descriptor = {      \
+        .appid = SUBGHZ_PROTOCOL_PLUGIN_APP_ID,                           \
+        .ep_api_version = SUBGHZ_PROTOCOL_PLUGIN_API_VERSION,             \
+        .entry_point = &ep_name##_plugin,                                 \
+    };                                                                    \
+    const FlipperAppPluginDescriptor* ep_name(void) {                     \
+        return &ep_name##_descriptor;                                     \
     }
 
 #ifdef __cplusplus
