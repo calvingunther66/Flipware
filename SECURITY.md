@@ -43,7 +43,7 @@ The parts of Flipware where a flaw matters most:
   reflash or debug probe. The PIN lock doesn't claim to stop those.
 - Bugs in the firmware Flipware was built from (official, Momentum, Unleashed)
   or in bundled third-party apps that Flipware hasn't changed. Tell us if
-  Flipware ships the bug and we'll decide whether to fix it here.
+  Flipware ships the bug.
 - The inherited radio features working as designed.
 
 ## Supported versions
