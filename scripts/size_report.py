@@ -232,7 +232,33 @@ def add_map(report, map_lines):
     top = sorted(objects.items(), key=lambda kv: (-kv[1], kv[0]))[:MAP_TOP_OBJECTS]
     report["flash_groups"] = groups
     report["flash_objects"] = dict(top)
+    # What the ELF says is in flash: its flash sections plus the load copy of
+    # .data. The map counts input sections before string merging, so it is a
+    # little larger; a big gap means the parser counts something it should not.
+    in_elf = report["data"] + sum(
+        s["size"] for s in report["sections"] if s["region"] == "flash"
+    )
+    report["flash_map_check"] = {"map": sum(groups.values()), "elf": in_elf}
     return report
+
+
+MAP_GAP_WARN = 0.05
+
+
+def map_gap_warning(report):
+    """A sentence when the map total and the ELF disagree by more than a few
+    percent, else None."""
+    check = report.get("flash_map_check")
+    if not check or not check["elf"]:
+        return None
+    gap = (check["map"] - check["elf"]) / check["elf"]
+    if abs(gap) <= MAP_GAP_WARN:
+        return None
+    return (
+        f"The linker map adds up to {check['map']:,} B but the ELF has "
+        f"{check['elf']:,} B in flash ({gap:+.0%}): the map parser probably "
+        "counts something that is not in the image, so read the table with care."
+    )
 
 
 def compare(current, baseline):
@@ -354,6 +380,10 @@ def render_markdown(current, delta, problems, baseline_note, budget):
             f"unless it has the `{budget.get('label', 'flash-budget')}` label."
         )
     out.append(f"Compared with: {baseline_note}.")
+    out.append(
+        "The branch name is stored in the image (`GIT_BRANCH`), so a longer branch "
+        "name than the baseline's adds a few dozen bytes on its own."
+    )
     out.append("")
 
     out.append("<details><summary>Sections</summary>\n")
@@ -377,11 +407,20 @@ def render_markdown(current, delta, problems, baseline_note, budget):
         out.append(
             f"<details open><summary>Flash by library or directory (from the linker map, {total:,} B)</summary>\n"
         )
+        gap = map_gap_warning(current)
+        if gap:
+            out.append(f"> **Warning:** {gap}\n")
         out.append("| Where | Flash | Share | Change |")
         out.append("|---|---:|---:|---:|")
-        for name, size in sorted(groups.items(), key=lambda kv: (-kv[1], kv[0]))[
-            :MAP_TOP_GROUPS
-        ]:
+        shown = dict(groups)
+        if changes is not None:
+            # A library that is gone from this build still shows, at 0 B.
+            for name in changes:
+                shown.setdefault(name, 0)
+        for name, size in sorted(
+            shown.items(),
+            key=lambda kv: (-kv[1], -abs((changes or {}).get(kv[0], 0)), kv[0]),
+        )[:MAP_TOP_GROUPS]:
             change = _signed(changes.get(name, 0)) if changes is not None else "n/a"
             out.append(
                 f"| {_code(name)} | {size:,} | {100 * size / total:.1f}% | {change} |"
@@ -447,8 +486,15 @@ def main(argv=None):
 
     current = build_report(read_elf(args.elf), radio_address, args.target, dfu_size)
     if args.map:
-        with open(args.map, errors="replace") as f:
-            add_map(current, f.readlines())
+        # The attribution is optional; the size gates are not.
+        try:
+            with open(args.map, errors="replace") as f:
+                add_map(current, f.readlines())
+        except Exception as e:  # noqa: BLE001
+            current.pop("flash_groups", None)
+            current.pop("flash_objects", None)
+            current.pop("flash_map_check", None)
+            print(f"::warning::Linker map not attributed: {e}")
     budget = load_json(args.budget)
 
     delta = None

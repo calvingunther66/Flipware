@@ -7,7 +7,8 @@ Flash is counted per input section: everything the linker placed in flash, plus
 the initial values of .data (placed in RAM, stored in flash). Each input section
 is charged to the object file it came from, and objects are grouped by the
 static library they sit in (libnfc.a) or, for loose object files, by their
-first two directories. Only the Python standard library is used.
+first two directories (three under applications/). Only the Python standard
+library is used.
 
 `--why SYMBOL` reads the cross reference table (the link has to use
 -Wl,--cref) and prints which file defines the symbol and which files use it.
@@ -21,6 +22,11 @@ import sys
 FLASH_START = 0x08000000
 FLASH_END = 0x08100000
 
+# Output sections that are address space the linker reserves, not code or data:
+# the free flash up to the radio stack and the heap/stack area in RAM. Their
+# `*fill*` is not part of the image.
+IGNORED_OUTPUT_SECTIONS = {".free_flash", "._user_heap_stack"}
+
 _INPUT_ONE = re.compile(r"^ (\S+)\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)\s+(\S.*)$")
 _INPUT_NAME = re.compile(r"^ (\S+)$")
 _INPUT_REST = re.compile(r"^\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)\s+(\S.*)$")
@@ -32,7 +38,9 @@ _OUTPUT_ONE = re.compile(
 )
 _OUTPUT_NAME = re.compile(r"^(\S+)$")
 _OUTPUT_REST = re.compile(
-    r"^\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)(?:\s+load address 0x([0-9a-fA-F]+))?\s*$"
+    r"^\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)"
+    + _NOLOAD
+    + r"(?:\s+load address 0x([0-9a-fA-F]+))?\s*$"
 )
 _FILL = re.compile(r"^ \*fill\*\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)")
 
@@ -59,7 +67,7 @@ def parse_map(lines):
         output.update(name=name, lma=int(lma, 16) if lma else None, noload=noload)
 
     def add(section, addr, size, path):
-        if not size or output["noload"]:
+        if not size or output["noload"] or output["name"] in IGNORED_OUTPUT_SECTIONS:
             return
         if _in_flash(addr):
             kind = "code and data"
@@ -92,6 +100,8 @@ def parse_map(lines):
             if m:
                 set_output(name, m.group(3), "(NOLOAD)" in line)
                 continue
+            # Not a header we understand: ignore what follows until the next one.
+            set_output(name, None, True)
         if pending_input is not None:
             m = _INPUT_REST.match(line)
             name, pending_input = pending_input, None
@@ -114,8 +124,10 @@ def parse_map(lines):
             if m:
                 add("*fill*", int(m.group(1), 16), int(m.group(2), 16), "(padding)")
                 continue
+            # A long section name sits alone on its line and the numbers follow
+            # on the next one. Custom sections (COMMON, MB_MEM2) have no dot.
             m = _INPUT_NAME.match(line)
-            if m and m.group(1).startswith("."):
+            if m:
                 pending_input = m.group(1)
             continue
 
@@ -165,7 +177,8 @@ def summarize(sections):
     for s in sections:
         group, obj = classify(s["file"])
         groups[group] = groups.get(group, 0) + s["size"]
-        key = f"{group}:{obj}"
+        # A loose object's path already starts with its group; say it once.
+        key = obj if obj.startswith(group + "/") else f"{group}:{obj}"
         objects[key] = objects.get(key, 0) + s["size"]
     return groups, objects
 
@@ -223,8 +236,8 @@ def main(argv=None):
     print()
     for name, size in sorted(objects.items(), key=lambda kv: -kv[1])[: args.top]:
         print(f"{size:>10,}  {name}")
+    cref = parse_cref(lines) if args.why else {}
     for sym in args.why:
-        cref = parse_cref(lines)
         if sym in cref:
             defined, users = cref[sym]
             print(f"\n{sym} is defined in {defined}, used by:")
