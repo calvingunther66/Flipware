@@ -1,6 +1,6 @@
 # Flipware roadmap
 
-A plan for roughly the next twelve months of Flipware, written on 2026-11-26
+A plan for the next stages of Flipware, written on 2026-11-26
 after a read-through of this repository, its CI, its companion repositories
 (the [VGM firmware fork](https://github.com/calvingunther66/video-game-module)
 and the [FlipperEmu fork](https://github.com/calvingunther66/FlipperEmu)) and
@@ -12,8 +12,8 @@ GitHub labelled `roadmap` and a matching
 [milestone](https://github.com/calvingunther66/Flipware/milestones?direction=asc&sort=due_date),
 and every epic is a sub-issue of its stage, so work can be picked up one issue
 (and one branch) at a time. The maintainer's "Flipware Roadmap" GitHub
-Project shows the same issues as a timeline, grouped by stage. Dates are targets, not
-promises: a stage ends when its exit criteria are met.
+Project shows the same issues as a timeline, grouped by stage. A stage ends when
+its exit criteria are met, not on a date.
 
 - [Where Flipware stands today](#where-flipware-stands-today)
 - [Principles](#principles)
@@ -83,16 +83,16 @@ the NFC protocol-plugin split. What is missing is mostly around it:
 
 ## Timeline
 
-| Stage | Window (target) | Theme | Release | Tracking |
-|---|---|---|---|---|
-| 0 | Dec 2026 (3 weeks) | Housekeeping, security fix, honest claims | none (lands in flpw-001) | [#25](https://github.com/calvingunther66/Flipware/issues/25) |
-| 1 | Dec 2026 – Jan 2027 | CI gates, emulator tests, bug burndown | **flpw-001** | [#26](https://github.com/calvingunther66/Flipware/issues/26) |
-| 2 | Feb – Mar 2027 | Independence, flash and RAM headroom | flpw-002 | [#27](https://github.com/calvingunther66/Flipware/issues/27) |
-| 3 | Apr – Jun 2027 | VGM desktop, display stream, coproc v2 | flpw-003 + VGM firmware 1.0 | [#28](https://github.com/calvingunther66/Flipware/issues/28) |
-| 4 | Jun – Aug 2027 | Sub-GHz, NFC, RFID, IR, files, battery | flpw-004 | [#29](https://github.com/calvingunther66/Flipware/issues/29) |
-| 5 | Aug – Oct 2027 | Wi-Fi updates, composite USB, BLE | flpw-005 | [#30](https://github.com/calvingunther66/Flipware/issues/30) |
-| 6 | Oct – Dec 2027 | JS SDK, app kit, docs, portable fixes, tests | flpw-006 | [#31](https://github.com/calvingunther66/Flipware/issues/31) |
-| 7 | 2028, as gates open | PKA, FIDO2, full BLE stack, background apps | as ready | [#32](https://github.com/calvingunther66/Flipware/issues/32) |
+| Stage | Theme | Release | Tracking |
+|---|---|---|---|
+| 0 | Housekeeping, security fix, honest claims | none (lands in flpw-001) | [#25](https://github.com/calvingunther66/Flipware/issues/25) |
+| 1 | CI gates, emulator tests, bug burndown | **flpw-001** | [#26](https://github.com/calvingunther66/Flipware/issues/26) |
+| 2 | Independence, flash and RAM headroom | flpw-002 | [#27](https://github.com/calvingunther66/Flipware/issues/27) |
+| 3 | VGM desktop, display stream, coproc v2 | flpw-003 + VGM firmware 1.0 | [#28](https://github.com/calvingunther66/Flipware/issues/28) |
+| 4 | Sub-GHz, NFC, RFID, IR, files, battery | flpw-004 | [#29](https://github.com/calvingunther66/Flipware/issues/29) |
+| 5 | Wi-Fi updates, composite USB, BLE | flpw-005 | [#30](https://github.com/calvingunther66/Flipware/issues/30) |
+| 6 | JS SDK, app kit, docs, portable fixes, tests | flpw-006 | [#31](https://github.com/calvingunther66/Flipware/issues/31) |
+| 7 | PKA, FIDO2, full BLE stack, background apps | as ready | [#32](https://github.com/calvingunther66/Flipware/issues/32) |
 
 ```mermaid
 flowchart LR
@@ -119,7 +119,7 @@ Priorities used below: **Must** (the stage doesn't ship without it),
 
 Tracking issue: [#25](https://github.com/calvingunther66/Flipware/issues/25)
 
-*December 2026, about three weeks.* Close the one security gap found, make
+Close the one security gap found, make
 the public claims match the code, and replace what Flipware inherited but
 doesn't use. Nothing here needs new hardware.
 
@@ -218,7 +218,7 @@ changelog exists.
 
 Tracking issue: [#26](https://github.com/calvingunther66/Flipware/issues/26)
 
-*December 2026 to January 2027, about seven weeks. Ships `flpw-001`.* Build
+*Ships `flpw-001`.* Build
 the safety net (size gate, host tests, emulator tests), burn down known bugs,
 and publish the first release.
 
@@ -356,7 +356,7 @@ host tests and emulator checks.
 
 Tracking issue: [#27](https://github.com/calvingunther66/Flipware/issues/27)
 
-*February to March 2027, about eight weeks. Ships `flpw-002`.* Settle how
+*Ships `flpw-002`.* Settle how
 Flipware stands on its own after the split from Momentum, then make room.
 Almost everything after this stage needs flash or RAM that doesn't exist today.
 
@@ -460,8 +460,7 @@ released.
 
 Tracking issue: [#28](https://github.com/calvingunther66/Flipware/issues/28)
 
-*April to June 2027, about ten weeks. Ships `flpw-003` and Flipware VGM
-firmware 1.0.* This turns the VGM from a screen mirror into Flipware's
+*Ships `flpw-003` and Flipware VGM firmware 1.0.* This turns the VGM from a screen mirror into Flipware's
 signature feature: a desktop on HDMI and over USB, and a coprocessor and
 bus expander that apps can use.
 
@@ -587,7 +586,7 @@ documented and tested in the emulator and on a VGM.
 
 Tracking issue: [#29](https://github.com/calvingunther66/Flipware/issues/29)
 
-*June to August 2027, about ten weeks. Ships `flpw-004`.* Workflow
+*Ships `flpw-004`.* Workflow
 improvements every user notices, built mostly as SD apps and plugins so they
 stay within the flash budget.
 
@@ -679,7 +678,7 @@ check, and `flpw-004` is released.
 
 Tracking issue: [#30](https://github.com/calvingunther66/Flipware/issues/30)
 
-*August to October 2027, about ten weeks. Ships `flpw-005`.* Updates without
+*Ships `flpw-005`.* Updates without
 a computer, USB that does two things at once, and steadier Bluetooth.
 
 ### 5.1 Updates and time over Wi-Fi · Must
@@ -751,7 +750,7 @@ release; the CLI survives HID use; `flpw-005` is released.
 
 Tracking issue: [#31](https://github.com/calvingunther66/Flipware/issues/31)
 
-*October to December 2027, about eight weeks. Ships `flpw-006`.* Make
+*Ships `flpw-006`.* Make
 Flipware easy to build on.
 
 ### 6.1 A Flipware JS SDK · Must
@@ -861,7 +860,7 @@ app can get CI with emulator runs from the template, docs are online, and
 
 Tracking issue: [#32](https://github.com/calvingunther66/Flipware/issues/32)
 
-*2028, each epic starting when its gate opens.* Research-sized work that gets
+*Each epic starts when its gate opens.* Research-sized work that gets
 more out of the STM32WB55 and the modules.
 
 ### 7.1 Hardware public-key crypto · Could
