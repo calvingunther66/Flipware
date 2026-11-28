@@ -146,8 +146,12 @@ class AppBuilder:
         if self.app.fap_file_assets:
             self.app._assets_dirs = [self.app._appdir.Dir(self.app.fap_file_assets)]
 
+        # Private libs go before the toolchain libs (m, gcc, ...): a static archive
+        # only resolves what is already undefined when it is scanned, so a private
+        # lib placed after -lm -lgcc could not use floor() or the soft-float helpers.
+        self.app_env.Prepend(LIBS=[*self.private_libs])
         self.app_env.Append(
-            LIBS=[*self.app.fap_libs, *self.private_libs, *self.app.fap_libs],
+            LIBS=[*self.app.fap_libs, *self.app.fap_libs],
             CPPPATH=[self.app_env.Dir(self.app_work_dir), self.app._appdir],
         )
 
