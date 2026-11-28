@@ -1,9 +1,9 @@
 # Sub-GHz Supported Protocols
 
-This file lists all supported Sub-GHz protocols available in Momentum Firmware, both tested and untested.
+This file lists all supported Sub-GHz protocols available in Flipware, both tested and untested.
 
 Many protocols support, and this documentation page, comes from [Unleashed Firmware](https://github.com/DarkFlippers/unleashed-firmware).
-Currently Momentum has the same Sub-GHz protocol list as Unleashed, and most Sub-GHz innovation is driven by the Unleashed team.
+The list follows Unleashed as of the last merge (`unlshd-094`). Some decoders are disabled in Flipware to save flash; see `lib/subghz/protocols/protocol_items.c`.
 
 That list is only for default SubGHz app, apps like *Weather Station* have their own protocols list
 
