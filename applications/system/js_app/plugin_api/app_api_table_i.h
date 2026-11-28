@@ -8,7 +8,10 @@
 static constexpr auto app_api_table = sort(create_array_t<sym_entry>(
     /* mJS is built into this app (see application.fam), not into the firmware.
      * Plugins resolve the mjs_* API through this table. */
-    API_METHOD(mjs_apply, mjs_err_t, (struct mjs*, mjs_val_t*, mjs_val_t, mjs_val_t, int, mjs_val_t*)),
+    API_METHOD(
+        mjs_apply,
+        mjs_err_t,
+        (struct mjs*, mjs_val_t*, mjs_val_t, mjs_val_t, int, mjs_val_t*)),
     API_METHOD(mjs_arg, mjs_val_t, (struct mjs*, int)),
     API_METHOD(mjs_array_buf_get_ptr, char*, (struct mjs*, mjs_val_t, size_t*)),
     API_METHOD(mjs_array_del, void, (struct mjs*, mjs_val_t, unsigned long)),
@@ -81,7 +84,10 @@ static constexpr auto app_api_table = sort(create_array_t<sym_entry>(
     API_METHOD(mjs_sprintf, void, (mjs_val_t, struct mjs*, char*, size_t)),
     API_METHOD(mjs_strcmp, int, (struct mjs*, mjs_val_t*, const char*, size_t)),
     API_METHOD(mjs_strerror, const char*, (struct mjs*, enum mjs_err)),
-    API_METHOD(mjs_struct_to_obj, mjs_val_t, (struct mjs*, const void*, const struct mjs_c_struct_member*)),
+    API_METHOD(
+        mjs_struct_to_obj,
+        mjs_val_t,
+        (struct mjs*, const void*, const struct mjs_c_struct_member*)),
     API_METHOD(mjs_to_boolean_v, mjs_val_t, (struct mjs*, mjs_val_t)),
     API_METHOD(mjs_to_string, mjs_err_t, (struct mjs*, mjs_val_t*, char**, size_t*, int*)),
     API_METHOD(mjs_typeof, const char*, (mjs_val_t)),
