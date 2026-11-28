@@ -24,8 +24,11 @@ FLASH_END = 0x08100000
 _INPUT_ONE = re.compile(r"^ (\S+)\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)\s+(\S.*)$")
 _INPUT_NAME = re.compile(r"^ (\S+)$")
 _INPUT_REST = re.compile(r"^\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)\s+(\S.*)$")
+_NOLOAD = r"(?:\s+\(NOLOAD\))?"
 _OUTPUT_ONE = re.compile(
-    r"^(\S+)\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)(?:\s+load address 0x([0-9a-fA-F]+))?\s*$"
+    r"^(\S+)\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)"
+    + _NOLOAD
+    + r"(?:\s+load address 0x([0-9a-fA-F]+))?\s*$"
 )
 _OUTPUT_NAME = re.compile(r"^(\S+)$")
 _OUTPUT_REST = re.compile(
@@ -43,28 +46,31 @@ def parse_map(lines):
 
     Each is a dict: `section`, `output` (output section), `size`, `file` (as the
     map prints it) and `kind` ('code and data' or 'data init' or 'padding').
+    Output sections marked NOLOAD (the free flash filler, RAM buffers) are left
+    out.
     """
     out = []
     in_map = False
-    output_name = None
-    output_vma = 0
-    output_lma = None
+    output = {"name": None, "lma": None, "noload": False}
     pending_input = None
     pending_output = None
 
+    def set_output(name, lma, noload):
+        output.update(name=name, lma=int(lma, 16) if lma else None, noload=noload)
+
     def add(section, addr, size, path):
-        if not size:
+        if not size or output["noload"]:
             return
         if _in_flash(addr):
             kind = "code and data"
-        elif output_lma is not None and _in_flash(output_lma):
+        elif output["lma"] is not None and _in_flash(output["lma"]):
             kind = "data init"
         else:
             return
         out.append(
             {
                 "section": section,
-                "output": output_name,
+                "output": output["name"],
                 "size": size,
                 "file": path,
                 "kind": kind,
@@ -84,9 +90,7 @@ def parse_map(lines):
             m = _OUTPUT_REST.match(line)
             name, pending_output = pending_output, None
             if m:
-                output_name = name
-                output_vma = int(m.group(1), 16)
-                output_lma = int(m.group(3), 16) if m.group(3) else None
+                set_output(name, m.group(3), "(NOLOAD)" in line)
                 continue
         if pending_input is not None:
             m = _INPUT_REST.match(line)
@@ -116,15 +120,12 @@ def parse_map(lines):
             continue
 
         m = _OUTPUT_ONE.match(line)
-        if m and m.group(1).startswith("."):
-            output_name = m.group(1)
-            output_vma = int(m.group(2), 16)
-            output_lma = int(m.group(4), 16) if m.group(4) else None
+        if m:
+            set_output(m.group(1), m.group(4), "(NOLOAD)" in line)
             continue
         m = _OUTPUT_NAME.match(line)
-        if m and m.group(1).startswith("."):
+        if m:
             pending_output = m.group(1)
-    del output_vma
     return out
 
 
@@ -136,7 +137,8 @@ def classify(path):
     """Return (group, object) for a path from the map.
 
     The group is the static library for archive members, `padding` for fill, or
-    the first two directories of the object file under the build directory.
+    the first two directories of the object file under the build directory
+    (three under applications/).
     """
     if path == "(padding)":
         return "(padding)", "(padding)"
@@ -149,11 +151,11 @@ def classify(path):
         # An object outside the build directory (the toolchain's crt files).
         return "(toolchain)/" + os.path.basename(path), os.path.basename(path)
     parts = short.split("/")
-    group = (
-        "/".join(parts[:2])
-        if len(parts) > 2
-        else (parts[0] if len(parts) > 1 else "(root)")
-    )
+    depth = 3 if parts[0] == "applications" else 2
+    if len(parts) > depth:
+        group = "/".join(parts[:depth])
+    else:
+        group = "/".join(parts[:-1]) or "(root)"
     return group, short
 
 
@@ -209,7 +211,13 @@ def main(argv=None):
     sections = parse_map(lines)
     groups, objects = summarize(sections)
     total = sum(groups.values())
-    print(f"Flash in the map: {total:,} B")
+    print(f"Flash in the map: {total:,} B (input sections, before string merging)")
+    by_output = {}
+    for sec in sections:
+        by_output[sec["output"]] = by_output.get(sec["output"], 0) + sec["size"]
+    for name, size in sorted(by_output.items(), key=lambda kv: -kv[1]):
+        print(f"{size:>10,}  output section {name}")
+    print()
     for name, size in sorted(groups.items(), key=lambda kv: -kv[1])[: args.top]:
         print(f"{size:>10,}  {name}")
     print()
