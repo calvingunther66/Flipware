@@ -20,7 +20,7 @@ promises: a stage ends when its exit criteria are met.
 - [Timeline](#timeline)
 - [Stage 0: Housekeeping and honest claims](#stage-0-housekeeping-and-honest-claims)
 - [Stage 1: Quality gates and the first release](#stage-1-quality-gates-and-the-first-release)
-- [Stage 2: Upstream sync and the flash and RAM diet](#stage-2-upstream-sync-and-the-flash-and-ram-diet)
+- [Stage 2: Independence and the flash and RAM diet](#stage-2-independence-and-the-flash-and-ram-diet)
 - [Stage 3: The Video Game Module platform](#stage-3-the-video-game-module-platform)
 - [Stage 4: Core apps, made easier](#stage-4-core-apps-made-easier)
 - [Stage 5: Connectivity: Wi-Fi devboard, USB and Bluetooth](#stage-5-connectivity-wi-fi-devboard-usb-and-bluetooth)
@@ -50,7 +50,7 @@ the NFC protocol-plugin split. What is missing is mostly around it:
 | VGM | Flipper side: coprocessor frame type 6 with CRC32, heatshrink, GPIO and a reserved HID-inject task (`applications/services/coproc`). RP2040 side: the HDMI desktop, the USB display stream, composite CDC+HID, heatshrink and GPIO exist on `feature/idea-list` of the VGM fork (+5.7k lines), unmerged into its default branch and never released. No computer-side viewer exists for the USB display stream. |
 | Tests | 31 on-device unit-test suites (~334 cases) and three host tests (`tests/host/*`, `subghz_compare_test.c`), none run in CI. The FlipperEmu fork already boots Momentum and Unleashed builds, models the VGM including Flipware's coproc (`scripts/vgm_check.py --coproc`), and catalogues 24 firmware bugs (FW-01 to FW-24). Flipware has fixed two of them (FW-07, FW-15). |
 | CI | Builds f7 only (f18 is versioned but never compiled), lints, and runs CodeQL. The indexer, size, PR-comment and webhook steps are always skipped. No caching; a push to a PR branch builds twice. |
-| Upstream | No merge from Momentum or Unleashed since 2026-06-01 (`33671b9`); Unleashed work has arrived as hand ports since. |
+| Upstream | Flipware was split from Momentum on 2026-11-27 and no longer tracks or merges from any upstream. The last merge was on 2026-06-01 (`33671b9`); Unleashed work has arrived as hand ports. See `documentation/UpstreamSync.md`. |
 | Project files | `CONTRIBUTING.md` is one newline, `CODEOWNERS` lists Momentum's maintainers, `FUNDING.yml` points at a Momentum maintainer, there is no `SECURITY.md`, and the JS SDK is still published as `@next-flip/fz-sdk-mntm`. Most Flipware features have no documentation; `ExpansionModules.md` doesn't mention frame type 6. |
 | Platform limits | One foreground app at a time (`loader.c:740`); `ble_light` is peripheral-only; USB runs one interface at a time; the SD card is on SPI shared with the display. |
 
@@ -65,11 +65,13 @@ the NFC protocol-plugin split. What is missing is mostly around it:
 3. **Emulator first, device second.** Every PR runs in FlipperEmu in CI; the
    PR template's "tested on a device" box stays, and the hardware matrix below
    says which device each stage needs.
-4. **Stay compatible.** Keep Momentum's app API and `FW_ORIGIN_Momentum`, so
-   apps built for Momentum keep running. Remove exported API symbols only at an
-   API major bump agreed with upstream.
-5. **Stay close to upstream.** Sync monthly, and send generic fixes upstream
-   so the fork's diff shrinks rather than grows.
+4. **Stay compatible.** Keep the inherited app API and `FW_ORIGIN_Momentum`, so
+   existing apps keep running. Remove exported API symbols only at a deliberate
+   API major bump, decided in a Flipware issue.
+5. **Stand alone.** Flipware doesn't track, merge from or send anything to
+   another firmware project. A fix from a public source is ported by hand, with
+   credit and the same gates as any change
+   (`documentation/UpstreamSync.md`).
 6. **Scope.** Flipware's own additions aim at usability, reliability and
    getting more out of hardware you own. The roadmap keeps the regional
    transmit limits as shipped defaults and doesn't plan jammers, flooding or
@@ -85,17 +87,17 @@ the NFC protocol-plugin split. What is missing is mostly around it:
 |---|---|---|---|---|
 | 0 | Dec 2026 (3 weeks) | Housekeeping, security fix, honest claims | none (lands in flpw-001) | [#25](https://github.com/calvingunther66/Flipware/issues/25) |
 | 1 | Dec 2026 – Jan 2027 | CI gates, emulator tests, bug burndown | **flpw-001** | [#26](https://github.com/calvingunther66/Flipware/issues/26) |
-| 2 | Feb – Mar 2027 | Upstream sync, flash and RAM headroom | flpw-002 | [#27](https://github.com/calvingunther66/Flipware/issues/27) |
+| 2 | Feb – Mar 2027 | Independence, flash and RAM headroom | flpw-002 | [#27](https://github.com/calvingunther66/Flipware/issues/27) |
 | 3 | Apr – Jun 2027 | VGM desktop, display stream, coproc v2 | flpw-003 + VGM firmware 1.0 | [#28](https://github.com/calvingunther66/Flipware/issues/28) |
 | 4 | Jun – Aug 2027 | Sub-GHz, NFC, RFID, IR, files, battery | flpw-004 | [#29](https://github.com/calvingunther66/Flipware/issues/29) |
 | 5 | Aug – Oct 2027 | Wi-Fi updates, composite USB, BLE | flpw-005 | [#30](https://github.com/calvingunther66/Flipware/issues/30) |
-| 6 | Oct – Dec 2027 | JS SDK, app kit, docs, upstreaming, tests | flpw-006 | [#31](https://github.com/calvingunther66/Flipware/issues/31) |
+| 6 | Oct – Dec 2027 | JS SDK, app kit, docs, portable fixes, tests | flpw-006 | [#31](https://github.com/calvingunther66/Flipware/issues/31) |
 | 7 | 2028, as gates open | PKA, FIDO2, full BLE stack, background apps | as ready | [#32](https://github.com/calvingunther66/Flipware/issues/32) |
 
 ```mermaid
 flowchart LR
   S0[0 Housekeeping] --> S1[1 Quality gates<br/>flpw-001]
-  S1 --> S2[2 Sync + diet<br/>flpw-002]
+  S1 --> S2[2 Independence + diet<br/>flpw-002]
   S2 --> S3[3 VGM platform<br/>flpw-003]
   S2 --> S4[4 Core apps<br/>flpw-004]
   S3 --> S5[5 Connectivity<br/>flpw-005]
@@ -350,36 +352,39 @@ host tests and emulator checks.
 
 ---
 
-## Stage 2: Upstream sync and the flash and RAM diet
+## Stage 2: Independence and the flash and RAM diet
 
 Tracking issue: [#27](https://github.com/calvingunther66/Flipware/issues/27)
 
-*February to March 2027, about eight weeks. Ships `flpw-002`.* Catch up with
-six months of upstream work, then make room. Almost everything after this
-stage needs flash or RAM that doesn't exist today.
+*February to March 2027, about eight weeks. Ships `flpw-002`.* Settle how
+Flipware stands on its own after the split from Momentum, then make room.
+Almost everything after this stage needs flash or RAM that doesn't exist today.
 
-### 2.1 Upstream sync playbook and first sync · Must
+### 2.1 Independence from upstream · Must
 
 Issue: [#45](https://github.com/calvingunther66/Flipware/issues/45)
 
-- Add remotes for Momentum (`Next-Flip/Momentum-Firmware` `dev`), Unleashed
-  and the official firmware. Write `documentation/UpstreamSync.md` covering:
-  - **Order:** merge Momentum `dev` into a sync branch; take Unleashed work
-    through Momentum where it has already landed there.
-  - **Hot files:**
-    - `targets/*/api_symbols.csv`;
-    - `assets/packs`;
-    - `applications/main/nfc`, after the protocol-scene move;
-    - the lfrfid, subghz and ibutton libraries and apps;
-    - `furi_hal_nfc*`, `furi_hal_sd.c` and `furi_hal_power.c`;
-    - `loader.c`, `gui.c`, `view_dispatcher.c` and `cli_vcp.c`;
-    - `elf_file.c` and the updater flasher.
-  - **API table conflicts:** take upstream's table, re-add Flipware's symbols,
-    bump the minor version.
-  - **Gates:** the sync must pass 1.2 to 1.4.
-- Merge current Momentum `dev` and bump the `applications/external`
-  submodule. Point it at Flipware's own Momentum-Apps fork if Flipware starts
-  patching apps.
+Flipware was split from Momentum on 2026-11-27: it left the fork network and no
+longer syncs. This item replaces the planned monthly sync and first merge.
+
+- Write `documentation/UpstreamSync.md` as a short independence note:
+  - the last synced point (Momentum `dev` at `33671b9`, 2026-06-01, plus the
+    Unleashed ports);
+  - what independence means: no remotes, no cadence, nothing sent to other
+    projects;
+  - how to port a fix from a public source by hand: read it in a throwaway
+    clone, check the license, apply it on a Flipware branch, credit the author,
+    watch the files that conflict most (`api_symbols.csv` and the NFC, Sub-GHz,
+    HAL and loader code) and pass the same gates as any change (1.2 to 1.4).
+- Remove leftover tracking config. Audit result: the repository has only the
+  `origin` remote and no workflow or script that syncs; the build's
+  informational check of the official firmware's API version stays.
+- Treat the two submodules hosted elsewhere (`applications/external` and
+  `assets/protobuf`) as pins that move only on purpose, in their own pull
+  request. If Flipware starts patching bundled apps, host a plain (not forked)
+  copy under the project's account.
+- Reword the plans that assumed an upstream (principles 4 and 5, 2.4, 6.5, 6.6,
+  always-on work and risks).
 
 ### 2.2 Find the bytes · Must
 
@@ -429,7 +434,7 @@ Issue: [#47](https://github.com/calvingunther66/Flipware/issues/47)
 Issue: [#48](https://github.com/calvingunther66/Flipware/issues/48)
 
 - Move mJS into the JS app (77 exported functions) at the next API major
-  bump agreed with Momentum.
+  bump (principle 4).
 - Remove duplicate built-in fonts. Move rarely used built-in icons and
   animations to SD asset packs.
 
@@ -445,7 +450,7 @@ Issue: [#49](https://github.com/calvingunther66/Flipware/issues/49)
   50-signal capture without an out-of-memory reboot. The changelog quotes
   about 50 signals normally and about 10 with qFlipper.
 
-**Stage 2 exit:** the first upstream sync is merged, there are at least 48 KiB
+**Stage 2 exit:** the independence note is merged, there are at least 48 KiB
 (12 pages) of free flash after it, the RAM targets are met, and `flpw-002` is
 released.
 
@@ -747,7 +752,7 @@ release; the CLI survives HID use; `flpw-005` is released.
 Tracking issue: [#31](https://github.com/calvingunther66/Flipware/issues/31)
 
 *October to December 2027, about eight weeks. Ships `flpw-006`.* Make
-Flipware easy to build on, and shrink the fork's diff.
+Flipware easy to build on.
 
 ### 6.1 A Flipware JS SDK · Must
 
@@ -810,23 +815,22 @@ Issue: [#73](https://github.com/calvingunther66/Flipware/issues/73)
 
 Issue: [#74](https://github.com/calvingunther66/Flipware/issues/74)
 
-- Decide which Momentum-Apps ship.
+- Decide which bundled apps ship.
 - Keep the external apps building cleanly.
 - Check each bundled app's compatibility in the emulator on every submodule
-  bump.
+  bump (bumps are deliberate, see `documentation/UpstreamSync.md`).
 
-### 6.6 Send generic fixes upstream · Should
+### 6.6 Keep generic fixes portable · Could
 
 Issue: [#75](https://github.com/calvingunther66/Flipware/issues/75)
 
-Offer Momentum and the official firmware the fixes that aren't Flipware-specific:
-- the performance pass (PR #12);
-- the SD fixes;
-- the FW-xx fixes from 1.5;
-- the code-scanning fixes (PR #16);
-- DMA receive on the expansion port.
-
-Every one accepted is one less conflict in future syncs.
+Flipware doesn't send changes to other projects. Anyone who wants a fix that
+isn't Flipware-specific can port it, so make that easy:
+- keep each generic fix in its own pull request, with a self-contained
+  description and a test;
+- candidates: the performance pass (PR #12), the SD fixes, the FW-xx fixes from
+  1.5, the code-scanning fixes (PR #16) and DMA receive on the expansion port;
+- list them in `documentation/UpstreamSync.md` once there are several.
 
 ### 6.7 Test coverage · Should
 
@@ -917,7 +921,8 @@ traces.
 
 ## Always-on work
 
-- **Upstream sync** every month, following the playbook from 2.1.
+- **Bundled apps and pinned submodules:** review at every release; bump only
+  on purpose (2.1).
 - **Flash budget review** at every release; raise the 1.2 threshold as space
   is freed.
 - **Security:** triage CodeQL alerts and `SECURITY.md` reports; every change
@@ -941,8 +946,8 @@ traces.
 | Risk | Effect | Mitigation |
 |---|---|---|
 | Flash stays full | Stages 3 to 7 stall | Stage 2 comes before features; size gate from 1.2; features default to SD |
-| Upstream drift | Each sync gets harder | Monthly syncs; send generic fixes upstream (6.6) |
-| Removing API symbols breaks Momentum apps | Users lose apps | Remove exports only at an agreed API major bump (principle 4) |
+| Inherited code ages | Fixes in public sources aren't picked up automatically | Read public changelogs for the areas Flipware inherited at each release and port what matters by hand (2.1) |
+| Removing API symbols breaks existing apps | Users lose apps | Remove exports only at a deliberate API major bump (principle 4) |
 | VGM work split across two repos | Version mismatch between Flipper and module | 3.1 releases both together, and the hello exchange (3.2) checks versions |
 | Emulator checks differ from hardware | False confidence | Keep the device checklist in the PR template and the release candidate pass (1.7) |
 | One maintainer | Stages slip | Must / Should / Could tags; a stage ships on its Musts |
