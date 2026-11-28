@@ -406,7 +406,6 @@ static bool bin_raw_decoder_alloc_buffers(SubGhzProtocolDecoderBinRAW* instance)
     }
     furi_kernel_unlock();
 
-    if(!allocated) FURI_LOG_W(TAG, "Not enough memory for BinRAW buffers");
     return allocated;
 }
 

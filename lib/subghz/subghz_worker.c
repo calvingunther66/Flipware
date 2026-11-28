@@ -144,8 +144,8 @@ void subghz_worker_start(SubGhzWorker* instance) {
             furi_thread_alloc_ex("SubGhzWorker", 2048, subghz_worker_thread_callback, instance);
     }
     if(!instance->stream) {
-        instance->stream =
-            furi_stream_buffer_alloc(sizeof(LevelDuration) * SUBGHZ_WORKER_STREAM_SAMPLES, sizeof(LevelDuration));
+        instance->stream = furi_stream_buffer_alloc(
+            sizeof(LevelDuration) * SUBGHZ_WORKER_STREAM_SAMPLES, sizeof(LevelDuration));
     }
 
     instance->running = true;
