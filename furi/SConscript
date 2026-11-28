@@ -12,10 +12,8 @@ libenv.ApplyLibFlags()
 
 sources = []
 for src in libenv.GlobRecursive("*.c"):
-    if src.name == "check.c":
-        # Its inline asm loads addresses with `ldr rX, =symbol`, which needs a
-        # literal pool right behind the function. Link-time optimization moves the
-        # pool away and the assembler fails with "offset out of range".
+    if str(src).replace("\\", "/").endswith(tuple(libenv.get("NO_LTO_SOURCES", ()))):
+        # See scripts/fbt/lto.py: link-time optimization breaks its inline asm.
         sources.append(
             libenv.StaticObject(src, CCFLAGS=libenv["CCFLAGS"] + ["-fno-lto"])
         )

@@ -81,6 +81,11 @@ vars.AddVariables(
         help="Optimize for size",
         default=True,
     ),
+    BoolVariable(
+        "LTO",
+        help="Link-time optimization of the compact base firmware (saves flash, slower build)",
+        default=True,
+    ),
     EnumVariable(
         "TARGET_HW",
         help="Hardware target",

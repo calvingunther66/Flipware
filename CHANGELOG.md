@@ -32,6 +32,7 @@ tag with no section of its own fails the release job.
 - Build size report shows flash by library and directory, and the biggest object files, from the linker map (`scripts/linkmap.py`); CI keeps the map for 14 days (#114)
 
 ### Updated
+- Compact builds use link-time optimization, which frees about 15 KB of flash; `./fbt LTO=0` turns it off. See `documentation/LinkTimeOptimization.md` (#115)
 - Website: a Download button for the latest release and a link to the install guide (#44)
 - Docs: step-by-step hardware test runbook for host sign-in, `documentation/HostAuthHardwareTest.md` (#99)
 - CI: every Build now boots the firmware in the FlipperEmu emulator and runs its checks: boot and radios, an update install, the VGM coprocessor, BLE pairing, the serial ports, the PIN lock and regression checks for the firmware bugs fixed here (FW-01, FW-02, FW-06). A pull request that breaks one of them turns red, with the device's logs and screenshots attached (#97)

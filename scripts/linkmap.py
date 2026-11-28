@@ -19,6 +19,7 @@ import os
 import re
 import sys
 
+LTO_GROUP = "(LTO partitions)"
 FLASH_START = 0x08000000
 FLASH_END = 0x08100000
 
@@ -142,18 +143,25 @@ def parse_map(lines):
 
 
 _ARCHIVE = re.compile(r"^(?P<archive>.+\.a)\((?P<member>[^()]+)\)$")
+# The partitions a link-time optimized build compiles at link time, named after a
+# temporary file (ccAbC123.ltrans4.ltrans.o): the name changes on every build.
+_LTO_PARTITION = re.compile(r"\.ltrans\d+\.ltrans\.o$")
 _BUILD_PREFIX = re.compile(r"^(?:.*/)?build/[^/]+/")
 
 
 def classify(path):
     """Return (group, object) for a path from the map.
 
-    The group is the static library for archive members, `padding` for fill, or
-    the first two directories of the object file under the build directory
-    (three under applications/).
+    The group is the static library for archive members, `(padding)` for fill,
+    `(LTO partitions)` for the code a link-time optimized build compiles at link
+    time (it no longer belongs to one library), or the first two directories of
+    the object file under the build directory (three under applications/).
     """
     if path == "(padding)":
         return "(padding)", "(padding)"
+    if _LTO_PARTITION.search(path):
+        # The code is spread over partitions and no longer belongs to one library.
+        return LTO_GROUP, LTO_GROUP
     m = _ARCHIVE.match(path)
     if m:
         archive = os.path.basename(m.group("archive"))

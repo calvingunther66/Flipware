@@ -2,6 +2,7 @@
 numbers, the comparison with an earlier build and the CI gates.
   python3 -I tests/host/size_report/test_size_report.py   (or run.sh)
 """
+
 import importlib.util
 import json
 import os
@@ -24,7 +25,9 @@ RAM = 0x20000008
 RADIO = 0x080D7000
 
 
-def make_elf(text, rodata, data, bss, symbols, heap=(0x20001000, 0x2002FC00), is64=False):
+def make_elf(
+    text, rodata, data, bss, symbols, heap=(0x20001000, 0x2002FC00), is64=False
+):
     """Build a tiny ARM-like ELF: .text and .rodata in flash, .data with its load
     copy in flash, .bss, the linker's .free_flash, and a symbol table.
 
@@ -61,7 +64,16 @@ def make_elf(text, rodata, data, bss, symbols, heap=(0x20001000, 0x2002FC00), is
 
     shstrtab = b"\0"
     names = {}
-    for name in (".text", ".rodata", ".data", ".bss", ".free_flash", ".symtab", ".strtab", ".shstrtab"):
+    for name in (
+        ".text",
+        ".rodata",
+        ".data",
+        ".bss",
+        ".free_flash",
+        ".symtab",
+        ".strtab",
+        ".shstrtab",
+    ):
         names[name] = len(shstrtab)
         shstrtab += name.encode() + b"\0"
 
@@ -95,7 +107,17 @@ def make_elf(text, rodata, data, bss, symbols, heap=(0x20001000, 0x2002FC00), is
         (names[".data"], 1, 3, data_addr, data_off, data, 0, 0, 0),
         (names[".bss"], 8, 3, bss_addr, 0, bss, 0, 0, 0),
         # The linker's marker for "the rest of the 1 MiB flash": must be ignored.
-        (names[".free_flash"], 1, 0, data_lma, 0, 0x100000 - (data_lma - FLASH), 0, 0, 0),
+        (
+            names[".free_flash"],
+            1,
+            0,
+            data_lma,
+            0,
+            0x100000 - (data_lma - FLASH),
+            0,
+            0,
+            0,
+        ),
         (names[".symtab"], 2, 0, 0, symtab_off, len(symtab), 7, 1, 24 if is64 else 16),
         (names[".strtab"], 3, 0, 0, strtab_off, len(strtab), 0, 0, 0),
         (names[".shstrtab"], 3, 0, 0, shstrtab_off, len(shstrtab), 0, 0, 0),
@@ -121,13 +143,37 @@ def make_elf(text, rodata, data, bss, symbols, heap=(0x20001000, 0x2002FC00), is
     ident = b"\x7fELF" + bytes([2 if is64 else 1, 1, 1]) + b"\0" * 9
     if is64:
         header = ident + struct.pack(
-            "<HHIQQQIHHHHHH", 2, 0xB7, 1, text_addr, ehsize, shoff, 0, ehsize,
-            phentsize, phnum, shentsize, len(sections), len(sections) - 1,
+            "<HHIQQQIHHHHHH",
+            2,
+            0xB7,
+            1,
+            text_addr,
+            ehsize,
+            shoff,
+            0,
+            ehsize,
+            phentsize,
+            phnum,
+            shentsize,
+            len(sections),
+            len(sections) - 1,
         )
     else:
         header = ident + struct.pack(
-            "<HHIIIIIHHHHHH", 2, 0x28, 1, text_addr, ehsize, shoff, 0, ehsize,
-            phentsize, phnum, shentsize, len(sections), len(sections) - 1,
+            "<HHIIIIIHHHHHH",
+            2,
+            0x28,
+            1,
+            text_addr,
+            ehsize,
+            shoff,
+            0,
+            ehsize,
+            phentsize,
+            phnum,
+            shentsize,
+            len(sections),
+            len(sections) - 1,
         )
     return header + ph + body + sh
 
@@ -149,7 +195,11 @@ def update_dir(root, radio="00 70 0D 08"):
     return path
 
 
-SYMBOLS = [("big_table", 5000, "object"), ("main_loop", 300, "func"), ("helper", 40, "func")]
+SYMBOLS = [
+    ("big_table", 5000, "object"),
+    ("main_loop", 300, "func"),
+    ("helper", 40, "func"),
+]
 
 
 class ReadElf(unittest.TestCase):
@@ -211,9 +261,16 @@ class Report(unittest.TestCase):
 
     def test_radio_address_parsing(self):
         # as scripts/update.py writes it: hex bytes, least significant first
-        self.assertEqual(size_report.parse_radio_address("A: 1\nRadio address: 00 70 0D 08\nB: 2\n"), 0x080D7000)
-        self.assertEqual(size_report.parse_radio_address("Radio address: 00 70 0D 08"), 0x080D7000)
-        self.assertEqual(size_report.parse_radio_address("Radio address: 00 00 0F 08\n"), 0x080F0000)
+        self.assertEqual(
+            size_report.parse_radio_address("A: 1\nRadio address: 00 70 0D 08\nB: 2\n"),
+            0x080D7000,
+        )
+        self.assertEqual(
+            size_report.parse_radio_address("Radio address: 00 70 0D 08"), 0x080D7000
+        )
+        self.assertEqual(
+            size_report.parse_radio_address("Radio address: 00 00 0F 08\n"), 0x080F0000
+        )
         with self.assertRaises(ValueError):
             size_report.parse_radio_address("Filetype: x\n")
         with self.assertRaises(ValueError):
@@ -225,7 +282,11 @@ class Compare(unittest.TestCase):
         before = report_for()
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "fw.elf")
-            symbols = [("big_table", 5200, "object"), ("main_loop", 100, "func"), ("new_fn", 90, "func")]
+            symbols = [
+                ("big_table", 5200, "object"),
+                ("main_loop", 100, "func"),
+                ("new_fn", 90, "func"),
+            ]
             write(path, make_elf(800_300, 70_000, 900, 5_100, symbols))
             after = size_report.build_report(size_report.read_elf(path), RADIO)
         return before, after
@@ -274,7 +335,11 @@ class Markdown(unittest.TestCase):
 
 
 class Gates(unittest.TestCase):
-    BUDGET = {"min_free_flash_bytes": 1000, "max_growth_bytes": 512, "label": "flash-budget"}
+    BUDGET = {
+        "min_free_flash_bytes": 1000,
+        "max_growth_bytes": 512,
+        "label": "flash-budget",
+    }
 
     def test_free_flash_gate(self):
         ok = {"free_flash": 1000}
@@ -286,19 +351,37 @@ class Gates(unittest.TestCase):
 
     def test_growth_gate_and_label(self):
         cur = {"free_flash": 5000}
-        self.assertEqual(size_report.check_gates(cur, {"image_size": 512}, self.BUDGET, False), [])
+        self.assertEqual(
+            size_report.check_gates(cur, {"image_size": 512}, self.BUDGET, False), []
+        )
         grown = size_report.check_gates(cur, {"image_size": 513}, self.BUDGET, False)
         self.assertEqual(len(grown), 1)
         self.assertIn("flash-budget", grown[0])
         # with the label the growth is allowed, but the free-flash floor still holds
-        self.assertEqual(size_report.check_gates(cur, {"image_size": 4000}, self.BUDGET, True), [])
-        self.assertEqual(len(size_report.check_gates({"free_flash": 10}, {"image_size": 4000}, self.BUDGET, True)), 1)
+        self.assertEqual(
+            size_report.check_gates(cur, {"image_size": 4000}, self.BUDGET, True), []
+        )
+        self.assertEqual(
+            len(
+                size_report.check_gates(
+                    {"free_flash": 10}, {"image_size": 4000}, self.BUDGET, True
+                )
+            ),
+            1,
+        )
 
     def test_no_baseline_means_no_growth_check(self):
-        self.assertEqual(size_report.check_gates({"free_flash": 5000}, None, self.BUDGET, False), [])
+        self.assertEqual(
+            size_report.check_gates({"free_flash": 5000}, None, self.BUDGET, False), []
+        )
 
     def test_shrinking_is_fine(self):
-        self.assertEqual(size_report.check_gates({"free_flash": 5000}, {"image_size": -2000}, self.BUDGET, False), [])
+        self.assertEqual(
+            size_report.check_gates(
+                {"free_flash": 5000}, {"image_size": -2000}, self.BUDGET, False
+            ),
+            [],
+        )
 
     def test_repo_budget_file_is_valid(self):
         with open(os.path.join(ROOT, ".github", "size_budget.json")) as f:
@@ -313,12 +396,29 @@ class CommandLine(unittest.TestCase):
         elf = os.path.join(d, "fw.elf")
         write(elf, make_elf(text, 70_000, 900, 5_000, SYMBOLS))
         bpath = os.path.join(d, "budget.json")
-        write(bpath, json.dumps(budget or {"min_free_flash_bytes": 1000, "max_growth_bytes": 512}), "w")
+        write(
+            bpath,
+            json.dumps(
+                budget or {"min_free_flash_bytes": 1000, "max_growth_bytes": 512}
+            ),
+            "w",
+        )
         out_json = os.path.join(d, "size.json")
         out_md = os.path.join(d, "size.md")
         code = size_report.main(
-            ["--elf", elf, "--update-dir", update_dir(d), "--budget", bpath,
-             "--out-json", out_json, "--out-md", out_md, *extra]
+            [
+                "--elf",
+                elf,
+                "--update-dir",
+                update_dir(d),
+                "--budget",
+                bpath,
+                "--out-json",
+                out_json,
+                "--out-md",
+                out_md,
+                *extra,
+            ]
         )
         return code, out_json, out_md
 
@@ -335,14 +435,18 @@ class CommandLine(unittest.TestCase):
                 saved = json.load(f)
             self.assertEqual(saved["dfu_size"], 1234)
             # next build: 600 B bigger, compared with the first one
-            code, _, out_md = self.run_cli(d, ["--baseline", out_json, "--baseline-note", "dev abc"], text=800_600)
+            code, _, out_md = self.run_cli(
+                d, ["--baseline", out_json, "--baseline-note", "dev abc"], text=800_600
+            )
             self.assertEqual(code, 1)
             with open(out_md) as f:
                 md = f.read()
             self.assertIn("Failed", md)
             self.assertIn("grew by 600 B", md)
             self.assertIn("dev abc", md)
-            code, _, _ = self.run_cli(d, ["--baseline", out_json, "--growth-allowed"], text=800_600)
+            code, _, _ = self.run_cli(
+                d, ["--baseline", out_json, "--growth-allowed"], text=800_600
+            )
             self.assertEqual(code, 0)
 
     def test_free_flash_failure_exit_code(self):
@@ -412,7 +516,18 @@ class LinkMapTest(unittest.TestCase):
         sections = self.linkmap.parse_map(SAMPLE_MAP.splitlines(True))
         _, objects = self.linkmap.summarize(sections)
         self.assertIn("applications/services/gui/gui.o", objects)
-        self.assertNotIn("applications/services/gui:applications/services/gui/gui.o", objects)
+        self.assertNotIn(
+            "applications/services/gui:applications/services/gui/gui.o", objects
+        )
+
+    def test_lto_partitions_have_a_stable_name(self):
+        for tmp in ("/tmp/ccAbC123.ltrans4.ltrans.o", "/tmp/ccZz9.ltrans12.ltrans.o"):
+            self.assertEqual(
+                self.linkmap.classify(tmp), ("(LTO partitions)", "(LTO partitions)")
+            )
+        self.assertEqual(
+            self.linkmap.classify("/opt/gcc/crtbegin.o")[0], "(toolchain)/crtbegin.o"
+        )
 
     def test_wrapped_section_name_without_a_dot(self):
         text = """\
@@ -423,8 +538,10 @@ Linker script and memory map
                 0x0000000008000000      0x100 build/f7-firmware-C/lib/libfoo.a(foo.o)
 """
         sections = self.linkmap.parse_map(text.splitlines(True))
-        self.assertEqual([(s["section"], s["size"]) for s in sections],
-                         [("CUSTOM_SECTION_WITH_A_LONG_NAME_THAT_WRAPS", 0x100)])
+        self.assertEqual(
+            [(s["section"], s["size"]) for s in sections],
+            [("CUSTOM_SECTION_WITH_A_LONG_NAME_THAT_WRAPS", 0x100)],
+        )
 
     def test_noload_sections_and_ram_buffers_are_not_flash(self):
         sections = self.linkmap.parse_map(SAMPLE_MAP.splitlines(True))
@@ -443,8 +560,16 @@ Linker script and memory map
 
     def test_report_with_map_and_baseline(self):
         lines = SAMPLE_MAP.splitlines(True)
-        base = {"target": "f7", "image_size": 0, "free_flash": 0, "free_pages": 0, "data": 0, "bss": 0,
-                "sections": [], "symbols": {}}
+        base = {
+            "target": "f7",
+            "image_size": 0,
+            "free_flash": 0,
+            "free_pages": 0,
+            "data": 0,
+            "bss": 0,
+            "sections": [],
+            "symbols": {},
+        }
         size_report.add_map(base, lines[:9])  # without gui.o
         now = dict(base)
         size_report.add_map(now, lines)
@@ -460,12 +585,16 @@ Linker script and memory map
         gone = dict(base)
         size_report.add_map(gone, lines)
         gone["flash_groups"] = dict(gone["flash_groups"], **{"libgone.a": 5000})
-        md = size_report.render_markdown(now, size_report.compare(now, gone), [], "x", {})
+        md = size_report.render_markdown(
+            now, size_report.compare(now, gone), [], "x", {}
+        )
         self.assertIn("`libgone.a` | 0 |", md)
         self.assertIn("-5,000", md)
         # a baseline from before the map existed gives "n/a", not a huge change
         old = {k: v for k, v in base.items() if k != "flash_groups"}
-        md = size_report.render_markdown(now, size_report.compare(now, old), [], "x", {})
+        md = size_report.render_markdown(
+            now, size_report.compare(now, old), [], "x", {}
+        )
         self.assertNotIn("+768", md)
 
 
@@ -483,14 +612,32 @@ class MapGuardTest(unittest.TestCase):
             write(elf, make_elf(800_000, 70_000, 900, 5_000, SYMBOLS))
             upd = update_dir(d)
             budget = os.path.join(d, "budget.json")
-            write(budget, json.dumps({"min_free_flash_bytes": 0, "max_growth_bytes": 0}), "w")
+            write(
+                budget,
+                json.dumps({"min_free_flash_bytes": 0, "max_growth_bytes": 0}),
+                "w",
+            )
             bad = os.path.join(d, "map")
             write(bad, b"Linker script and memory map\n.text 0xZZ\n")
             out_json, out_md = os.path.join(d, "o.json"), os.path.join(d, "o.md")
-            with mock.patch.object(size_report.linkmap, "parse_map", side_effect=ValueError("boom")):
+            with mock.patch.object(
+                size_report.linkmap, "parse_map", side_effect=ValueError("boom")
+            ):
                 code = size_report.main(
-                    ["--elf", elf, "--update-dir", upd, "--budget", budget,
-                     "--map", bad, "--out-json", out_json, "--out-md", out_md]
+                    [
+                        "--elf",
+                        elf,
+                        "--update-dir",
+                        upd,
+                        "--budget",
+                        budget,
+                        "--map",
+                        bad,
+                        "--out-json",
+                        out_json,
+                        "--out-md",
+                        out_md,
+                    ]
                 )
             self.assertEqual(code, 0)
             self.assertTrue(os.path.exists(out_md))

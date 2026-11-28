@@ -9,6 +9,7 @@ but no Windows Hello machine or security key has been used with it yet.
 
 Needs: pip install "fido2>=2.0" pyserial
 """
+
 import argparse
 import base64
 import hashlib
