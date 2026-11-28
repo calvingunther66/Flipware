@@ -21,6 +21,11 @@ import sys
 FLASH_START = 0x08000000
 FLASH_END = 0x08100000
 
+# Output sections that are address space the linker reserves, not code or data:
+# the free flash up to the radio stack and the heap/stack area in RAM. Their
+# `*fill*` is not part of the image.
+IGNORED_OUTPUT_SECTIONS = {".free_flash", "._user_heap_stack"}
+
 _INPUT_ONE = re.compile(r"^ (\S+)\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)\s+(\S.*)$")
 _INPUT_NAME = re.compile(r"^ (\S+)$")
 _INPUT_REST = re.compile(r"^\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)\s+(\S.*)$")
@@ -32,7 +37,9 @@ _OUTPUT_ONE = re.compile(
 )
 _OUTPUT_NAME = re.compile(r"^(\S+)$")
 _OUTPUT_REST = re.compile(
-    r"^\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)(?:\s+load address 0x([0-9a-fA-F]+))?\s*$"
+    r"^\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)"
+    + _NOLOAD
+    + r"(?:\s+load address 0x([0-9a-fA-F]+))?\s*$"
 )
 _FILL = re.compile(r"^ \*fill\*\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)")
 
@@ -59,7 +66,7 @@ def parse_map(lines):
         output.update(name=name, lma=int(lma, 16) if lma else None, noload=noload)
 
     def add(section, addr, size, path):
-        if not size or output["noload"]:
+        if not size or output["noload"] or output["name"] in IGNORED_OUTPUT_SECTIONS:
             return
         if _in_flash(addr):
             kind = "code and data"
@@ -92,6 +99,8 @@ def parse_map(lines):
             if m:
                 set_output(name, m.group(3), "(NOLOAD)" in line)
                 continue
+            # Not a header we understand: ignore what follows until the next one.
+            set_output(name, None, True)
         if pending_input is not None:
             m = _INPUT_REST.match(line)
             name, pending_input = pending_input, None

@@ -367,8 +367,11 @@ Linker script and memory map
                 0x0000000008000300      0x40 /opt/toolchain/arm-none-eabi/lib/thumb/v7e-m+fp/hard/libc_nano.a(lib_a-strtod.o)
  *fill*         0x0000000008000340        0x4
  .text.main     0x0000000008000344       0x80 build/f7-firmware-C/applications/services/gui/gui.o
-.free_flash     0x00000000080e0000        0x0 (NOLOAD)
- *fill*         0x00000000080e0000    0x58000
+.free_flash     0x00000000080d6d68    0x29000
+ *fill*         0x00000000080d6d68    0x29000
+._user_heap_stack
+                0x0000000020001000    0x2e000
+ *fill*         0x0000000020001000    0x2e000
 MB_MEM1         0x0000000020030000      0x10 (NOLOAD)
  MB_MEM1        0x0000000020030000      0x10 build/f7-firmware-C/lib/libnfc.a(nfc.o)
 .bss            0x0000000020000000      0x400
