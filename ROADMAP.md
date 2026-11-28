@@ -434,9 +434,14 @@ Issue: [#47](https://github.com/calvingunther66/Flipware/issues/47)
 Issue: [#48](https://github.com/calvingunther66/Flipware/issues/48)
 
 - Move mJS into the JS app (77 exported functions) at the next API major
-  bump (principle 4).
-- Remove duplicate built-in fonts. Move rarely used built-in icons and
-  animations to SD asset packs.
+  bump (principle 4). **Done** in [#119](https://github.com/calvingunther66/Flipware/pull/119):
+  41,264 B of flash, API 88.0.
+- Remove duplicate built-in fonts. **Nothing to remove:** only 5 of about
+  1,674 fonts are referenced and the linker already drops the rest.
+- Move rarely used built-in icons and animations to SD asset packs.
+  **Partly done** in #119: the 94 Infrared-only icons are no longer exported
+  (9,528 B). Deferred: about 68 other unused icons (each is imported by some
+  app) and the animations (needs dolphin manifest and fallback work).
 
 ### 2.5 RAM headroom · Must
 

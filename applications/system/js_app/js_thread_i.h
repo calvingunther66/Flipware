@@ -1,15 +1,15 @@
 #pragma once
 
 #include <furi.h>
-#include <mjs_core_public.h>
-#include <mjs_ffi_public.h>
-#include <mjs_exec_public.h>
-#include <mjs_object_public.h>
-#include <mjs_string_public.h>
-#include <mjs_array_public.h>
-#include <mjs_util_public.h>
-#include <mjs_primitive_public.h>
-#include <mjs_array_buf_public.h>
+#include "lib/mjs/mjs_core_public.h"
+#include "lib/mjs/mjs_ffi_public.h"
+#include "lib/mjs/mjs_exec_public.h"
+#include "lib/mjs/mjs_object_public.h"
+#include "lib/mjs/mjs_string_public.h"
+#include "lib/mjs/mjs_array_public.h"
+#include "lib/mjs/mjs_util_public.h"
+#include "lib/mjs/mjs_primitive_public.h"
+#include "lib/mjs/mjs_array_buf_public.h"
 
 #ifdef __cplusplus
 extern "C" {
