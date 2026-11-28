@@ -228,8 +228,26 @@ jobs:
           fi
           elf=$(ls dist/${TARGET}-*/flipper-z-${TARGET}-firmware-*.elf | head -n1)
           update_dir=$(ls -d dist/${TARGET}-*/${TARGET}-update-*/ | head -n1)
+          # The linker map, for the flash-by-library table (and kept as an artifact).
+          map=$(ls build/${TARGET}-firmware-*/firmware.elf.map 2>/dev/null | head -n1 || true)
+          map_args=""
+          if [ -n "$map" ] ; then
+            cp "$map" "firmware-$TARGET.map"
+            map_args="--map $map"
+          else
+            echo "::warning::No linker map found; the report has no flash-by-library table."
+          fi
+          if [ -n "$map" ] ; then
+            echo "::group::Linker map: biggest libraries, objects and who pulls in float and strtod code"
+            python3 scripts/linkmap.py "$map" --top 80 \
+              --why _strtod_l --why strtod --why strtof --why atof --why powf --why pow \
+              --why _printf_float --why _scanf_float --why __ssprint_r --why _svfprintf_r \
+              --why _vfprintf_r --why __d2b --why __ieee754_pow --why __aeabi_dmul --why __aeabi_ddiv \
+              --why __aeabi_fmul --why __aeabi_fdiv --why __aeabi_f2d --why __aeabi_d2f || true
+            echo "::endgroup::"
+          fi
           status=0
-          python3 scripts/size_report.py --elf "$elf" --update-dir "$update_dir" \
+          python3 scripts/size_report.py --elf "$elf" --update-dir "$update_dir" $map_args \
             --budget "$budget" --target "$TARGET" $growth \
             --baseline "size-baseline/size-$TARGET.json" \
             --baseline-note "${BASELINE_NOTE:-nothing (no earlier build to compare with)}" \
@@ -245,6 +263,16 @@ jobs:
           path: |
             size-${{ env.TARGET }}.json
             size-report.md
+
+      # The full linker map (with the cross reference table), for digging into
+      # what pulls a symbol in: scripts/linkmap.py firmware-f7.map --why SYMBOL
+      - name: "Upload the linker map"
+        if: ${{ !cancelled() && hashFiles(format('firmware-{0}.map', env.TARGET)) != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linker-map-${{ env.TARGET }}
+          path: firmware-${{ env.TARGET }}.map
+          retention-days: 14
 
   # Posts (or updates) the size report as a comment on the pull request. It is a
   # separate job so that the job that builds the pull request's code never holds

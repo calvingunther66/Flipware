@@ -2,7 +2,6 @@ import heatshrink2
 import argparse
 import io
 
-
 parser = argparse.ArgumentParser(
     description="Turn .xbm files into cooked .bm files for flipper FS"
 )

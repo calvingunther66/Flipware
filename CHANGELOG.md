@@ -29,8 +29,10 @@ tag with no section of its own fails the release job.
 ### Added
 - Install guide (`documentation/Install.md`): qFlipper, SD card, moving over from Momentum and from the official firmware, what an update changes, recovery; and `documentation/ReleaseChecklist.md`, the release candidate and device pass every release goes through (#44)
 - Build: host tests for the host sign-in code, the 125 kHz RFID Add Manually formats, Sub-GHz capture compare and release notes now run in CI on every pull request, and locally with `./fbt test_host` (#40)
+- Build size report shows flash by library and directory, and the biggest object files, from the linker map (`scripts/linkmap.py`); CI keeps the map for 14 days (#114)
 
 ### Updated
+- Compact builds use link-time optimization, which frees about 15 KB of flash; `./fbt LTO=0` turns it off. See `documentation/LinkTimeOptimization.md` (#115)
 - Flipware no longer follows Momentum or any other upstream: `documentation/UpstreamSync.md` is now a short independence note (last synced point, how to port a fix by hand), and the ReadMe, contributing guide, security policy and roadmap say so (#45)
 - Website: a Download button for the latest release and a link to the install guide (#44)
 - Docs: step-by-step hardware test runbook for host sign-in, `documentation/HostAuthHardwareTest.md` (#99)

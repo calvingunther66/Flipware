@@ -1,5 +1,6 @@
 import itertools
 
+from fbt import lto
 from fbt.sdk.cache import LazySdkVersionLoader
 from fbt.version import get_git_commit_unix_timestamp
 from fbt_extra.util import link_elf_dir_as_latest, should_gen_cdb_and_link_dir
@@ -104,6 +105,19 @@ if env.subst("$FIRMWARE_APP_SET").startswith("unit_tests"):
     env.Replace(SKIP_EXTERNAL=True)
 
 env.ConfigureForTarget(env.subst("${TARGET_HW}"))
+
+# Link-time optimization of the compact base firmware (roadmap 2.2): about 15 KB
+# of flash. Libraries, targets, furi and the services all get it, so it is set
+# before the modules are built. `LTO=0` turns it off, for size or debug comparisons
+# and to rule it out. Fat objects keep ar and ranlib working; the LTO bytecode in
+# them is what the linker plugin uses. The lists are in scripts/fbt/lto.py,
+# checked by tests/host/lto_lists, and documentation/LinkTimeOptimization.md says why.
+if env["LTO"] and env["COMPACT"] and env["IS_BASE_FIRMWARE"]:
+    env.Replace(NO_LTO_LIBS=lto.NO_LTO_LIBS, NO_LTO_SOURCES=lto.NO_LTO_SOURCES)
+    env.Append(
+        CCFLAGS=lto.CCFLAGS,
+        LINKFLAGS=lto.LINKFLAGS + [f"-Wl,--undefined=__wrap_{n}" for n in lto.WRAPPERS],
+    )
 
 Export("env")
 

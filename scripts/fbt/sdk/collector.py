@@ -9,7 +9,6 @@ from . import (
     ApiHeader,
 )
 
-
 # 'Fixing' complaints about typedefs
 CxxParser._fundamentals.discard("wchar_t")
 

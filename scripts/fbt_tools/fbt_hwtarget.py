@@ -1,5 +1,7 @@
 import json
 
+from fbt import lto
+
 
 class HardwareTargetLoader:
     def __init__(self, env, root_target_scons_dir, target_id):
@@ -127,6 +129,10 @@ def ApplyLibFlags(env):
     )
     # print("Flags for ", env.get("FW_LIB_NAME", "Default"), flags_to_apply)
     env.MergeFlags(flags_to_apply)
+    # Libraries that external apps link into themselves (fap_libs) have to stay
+    # plain object code: the apps are linked with -Ur, which can't take LTO objects.
+    if env.get("FW_LIB_NAME") in env.get("NO_LTO_LIBS", ()):
+        env.Replace(CCFLAGS=[f for f in env["CCFLAGS"] if f not in lto.ALL_FLAGS])
 
 
 def generate(env):

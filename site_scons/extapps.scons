@@ -1,3 +1,4 @@
+from fbt import lto
 from dataclasses import dataclass, field
 from fbt.appmanifest import FlipperAppType
 
@@ -19,6 +20,11 @@ appenv = ENV["APPENV"] = ENV.Clone(
 appenv.Replace(
     LINKER_SCRIPT_PATH=appenv["APP_LINKER_SCRIPT_PATH"],
 )
+
+# External apps are linked with -Ur and need real object code and symbols, so
+# the firmware's link-time optimization flags (firmwareopts.scons) stay out.
+for _var in ("CCFLAGS", "LINKFLAGS"):
+    appenv[_var] = [f for f in appenv[_var] if f not in lto.ALL_FLAGS]
 
 appenv.AppendUnique(
     CCFLAGS=[

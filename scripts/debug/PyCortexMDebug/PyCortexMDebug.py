@@ -1,4 +1,4 @@
-""" Simple script to load from GDB to import all components
+"""Simple script to load from GDB to import all components
 
 ===============================================================================
 

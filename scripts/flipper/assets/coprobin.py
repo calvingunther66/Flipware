@@ -4,7 +4,6 @@ import os
 import os.path
 import sys
 
-
 #  From lib/stm32wb_copro/wpan/interface/patterns/ble_thread/shci/shci.h
 __STACK_TYPE_CODES = {
     "BLE_FULL": 0x01,
