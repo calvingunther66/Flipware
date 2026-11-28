@@ -111,7 +111,30 @@ env.ConfigureForTarget(env.subst("${TARGET_HW}"))
 if env["COMPACT"] and env["IS_BASE_FIRMWARE"]:
     env.Append(
         CCFLAGS=["-flto", "-ffat-lto-objects"],
-        LINKFLAGS=["-flto", "-fuse-linker-plugin"],
+        LINKFLAGS=["-flto", "-fuse-linker-plugin"]
+        # The libc objects call these through --wrap, which the LTO plugin can't
+        # see, so it would drop our replacements as unused.
+        + [
+            f"-Wl,--undefined=__wrap_{name}"
+            for name in (
+                "_malloc_r",
+                "_free_r",
+                "_calloc_r",
+                "_realloc_r",
+                "printf",
+                "vsnprintf",
+                "puts",
+                "putchar",
+                "putc",
+                "snprintf",
+                "fflush",
+                "fgetc",
+                "getc",
+                "getchar",
+                "fgets",
+                "ungetc",
+            )
+        ],
     )
 
 Export("env")
