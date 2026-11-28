@@ -9,7 +9,7 @@
 
 **To reset device name to default - do same steps but do not enter any characters, leave it empty and click** `Save`
 
-Currently, changing Flipper name on Momentum Firmware also affects:
+Currently, changing Flipper name on Flipware also affects:
 - Bluetooth device name
 - Bluetooth MAC address (3 bytes of Flipper ID + 3 bytes of ASCII from custom name)
 - USB device name

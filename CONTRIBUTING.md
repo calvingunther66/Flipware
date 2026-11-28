@@ -104,14 +104,16 @@ with care. The exported symbols are listed in `targets/f7/api_symbols.csv` and
   again. Commit the `.csv` changes in both targets; CI fails on uncommitted
   changes after the build.
 - Do not remove or change a `+` symbol. That needs a major API bump, which is
-  agreed with upstream first. Only then raise the major version by hand.
-- Flipware keeps Momentum's API version. A difference from the official
+  agreed in a Flipware issue first. Only then raise the major version by hand.
+- Flipware keeps the API version it inherited. A difference from the official
   firmware shows up as a CI warning and is expected.
 
 ## Crediting upstream authors
 
-Flipware is built on Momentum, Unleashed and the official firmware, and ports
-code from them and from other projects. When you bring code in:
+Flipware started from Momentum, Unleashed and the official firmware, and ports
+code from them and from other projects by hand
+([documentation/UpstreamSync.md](documentation/UpstreamSync.md)). When you bring
+code in:
 
 - Say where it came from in the commit message (project, release or commit) and
   in the changelog line, with the author's handle, for example
@@ -120,7 +122,6 @@ code from them and from other projects. When you bring code in:
   is compatible with GPL-3.0 before you copy anything.
 - Do not squash several authors into one. Keep authorship in the git history
   where you can.
-- Send generic fixes upstream too, so the fork's diff shrinks.
 
 ## AI-assisted pull requests
 
