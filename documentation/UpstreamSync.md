@@ -9,8 +9,9 @@ fix from a public source by hand, if that is ever wanted.
 ## Where Flipware stood at the split
 
 - Last merge from the projects it was built on: 2026-06-01. Momentum `dev`
-  at `33671b9`, plus Unleashed `unlshd-093` and `unlshd-094` ports. The
-  project owner judged Flipware up to date at the split.
+  at `33671b9`, plus Unleashed `unlshd-093` and `unlshd-094` ports. On
+  2026-11-27 the maintainer judged Flipware up to date with Momentum; that
+  was not checked against Momentum's repository when this note was written.
 - Everything newer in those projects is not in Flipware, and no one is
   watching for it.
 - Momentum's changelog up to that point is kept for reference in
