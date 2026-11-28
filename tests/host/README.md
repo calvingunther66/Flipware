@@ -8,6 +8,7 @@ and runs one test; a non-zero exit means it failed.
 | --- | --- |
 | `host_auth` | Host sign-in core: known-answer vectors, parser and DER fuzzing, ASan and UBSan |
 | `lfrfid_manual_format` | 125 kHz RFID "Add Manually" formats and the protocols behind them |
+| `subghz_plugins` | The Sub-GHz plugin bundle table matches the plugin sources and the app manifest |
 | `subghz_compare` | Sub-GHz capture compare (the test source sits in `applications/main/subghz/helpers/tests/`) |
 | `release_notes` | Release notes are read from the tag's `CHANGELOG.md` section only |
 | `size_report` | `scripts/size_report.py`: ELF section and symbol sizes, radio address, comparison with the last build, and the free-flash and growth gates |
