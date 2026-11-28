@@ -8,12 +8,14 @@
 
 <h3 align="center">Open-source custom firmware for Flipper Zero</h3>
 
-Flipware is an independent, open-source firmware for the Flipper Zero. It is
-built on [Momentum](https://github.com/Next-Flip/Momentum-Firmware), which in
-turn builds on the [Official Firmware](https://github.com/flipperdevices/flipperzero-firmware)
-and [Unleashed](https://github.com/DarkFlippers/unleashed-firmware). It keeps
-everything Momentum offers and adds its own work on expansion hardware, with its
-own look and its own release rules.
+Flipware is an independent, open-source firmware for the Flipper Zero. It
+started as a fork of [Momentum](https://github.com/Next-Flip/Momentum-Firmware),
+which in turn builds on the [Official Firmware](https://github.com/flipperdevices/flipperzero-firmware)
+and [Unleashed](https://github.com/DarkFlippers/unleashed-firmware), and since
+2026-11-27 it no longer follows any of them
+([independence note](documentation/UpstreamSync.md)). It keeps what it inherited
+and adds its own work on expansion hardware, with its own look and its own
+release rules.
 
 Flipware is not affiliated with Flipper Devices Inc. or the Momentum team.
 "Flipper Zero" is a trademark of Flipper Devices Inc. and is used here only to
@@ -42,12 +44,11 @@ the USB stream. Both features stay in preview until Stage 3 of the
 released build. The Flipper-side code for coprocessor offload is in this
 repository; the RP2040 side is part of the same VGM firmware work.
 
-Everything from Momentum is still here: asset packs, the main menu and lock
-screen customisation, Bad KB, the extended Sub-GHz and NFC tools, and the rest
-of its [feature list](https://github.com/Next-Flip/Momentum-Firmware#list-of-changes).
+What it inherited is still here: asset packs, the main menu and lock screen
+customisation, Bad KB, and the extended Sub-GHz and NFC tools.
 
-Apps built for Momentum keep working: Flipware keeps Momentum's app API and
-still defines `FW_ORIGIN_Momentum` for apps that check for it.
+Apps built for Momentum keep working: Flipware keeps the app API it inherited
+and still defines `FW_ORIGIN_Momentum` for apps that check for it.
 
 ## Roadmap
 
