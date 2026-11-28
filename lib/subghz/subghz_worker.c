@@ -4,6 +4,11 @@
 
 #define TAG "SubGhzWorker"
 
+// Samples (level+duration edges) the rx callback can queue for the worker
+// thread. 4 bytes each: 2048 = 8 KB (it was 4096 = 16 KB). The thread drains
+// it every few ms, so a burst has to be about 100 ms of edges to overrun it.
+#define SUBGHZ_WORKER_STREAM_SAMPLES 2048
+
 struct SubGhzWorker {
     FuriThread* thread;
     FuriStreamBuffer* stream;
@@ -140,7 +145,7 @@ void subghz_worker_start(SubGhzWorker* instance) {
     }
     if(!instance->stream) {
         instance->stream =
-            furi_stream_buffer_alloc(sizeof(LevelDuration) * 4096, sizeof(LevelDuration));
+            furi_stream_buffer_alloc(sizeof(LevelDuration) * SUBGHZ_WORKER_STREAM_SAMPLES, sizeof(LevelDuration));
     }
 
     instance->running = true;
