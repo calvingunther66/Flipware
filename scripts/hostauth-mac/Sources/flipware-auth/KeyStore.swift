@@ -70,15 +70,9 @@ enum KeyStore {
         }
     }
 
-    static func create(uid: String, label: String, policy: KeyPolicy) throws
-        -> (StoredKey, SecureEnclave.P256.Signing.PrivateKey)
-    {
-        guard SecureEnclave.isAvailable else { throw KeyStoreError.noSecureEnclave }
-        let state = biometryState()
-        if policy == .biometryCurrentSet && state == nil { throw KeyStoreError.noTouchID }
-
-        // Every signature needs a fresh approval: there is no "reuse" setting on the
-        // key itself, and each sign() below uses a new LAContext with reuse off.
+    /// The key's access control: the Secure Enclave asks for Touch ID (or the password)
+    /// on every use. Shared by key creation and by the grant's one-time approval.
+    static func accessControl(policy: KeyPolicy) throws -> SecAccessControl {
         var flags: SecAccessControlCreateFlags = [.privateKeyUsage]
         switch policy {
         case .biometryCurrentSet: flags.insert(.biometryCurrentSet)
@@ -88,6 +82,35 @@ enum KeyStore {
             let access = SecAccessControlCreateWithFlags(
                 nil, kSecAttrAccessibleWhenUnlockedThisDeviceOnly, flags, nil)
         else { throw KeyStoreError.accessControl }
+        return access
+    }
+
+    /// UIDs of every Flipper this Mac has a key for.
+    static func storedUIDs() -> [String] {
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return files.filter { $0.hasSuffix(".json") }.map { String($0.dropLast(5)) }.sorted()
+    }
+
+    /// Throws when a Touch ID finger change has permanently invalidated the key.
+    static func checkNotInvalidated(_ stored: StoredKey) throws {
+        if stored.policy == .biometryCurrentSet, let then = stored.biometryState,
+            let now = biometryState(), now != then
+        {
+            throw KeyStoreError.invalidated(stored.uid)
+        }
+    }
+
+    static func create(uid: String, label: String, policy: KeyPolicy) throws
+        -> (StoredKey, SecureEnclave.P256.Signing.PrivateKey)
+    {
+        guard SecureEnclave.isAvailable else { throw KeyStoreError.noSecureEnclave }
+        let state = biometryState()
+        if policy == .biometryCurrentSet && state == nil { throw KeyStoreError.noTouchID }
+
+        // Every signature needs a fresh approval: there is no "reuse" setting on the
+        // key itself, and each sign() below uses a new LAContext with reuse off.
+        // (The timed grant in Grant.swift is the one deliberate exception.)
+        let access = try accessControl(policy: policy)
 
         let key = try SecureEnclave.P256.Signing.PrivateKey(accessControl: access)
         let stored = StoredKey(
@@ -126,11 +149,7 @@ enum KeyStore {
         context.touchIDAuthenticationAllowableReuseDuration = 0  // no "recently unlocked" grace
         context.interactionNotAllowed = false
 
-        if stored.policy == .biometryCurrentSet, let then = stored.biometryState,
-            let now = biometryState(), now != then
-        {
-            throw KeyStoreError.invalidated(stored.uid)
-        }
+        try checkNotInvalidated(stored)
 
         do {
             let key = try SecureEnclave.P256.Signing.PrivateKey(

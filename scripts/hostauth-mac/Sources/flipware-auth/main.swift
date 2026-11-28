@@ -9,6 +9,11 @@ struct Options {
     var label = Host.current().localizedName ?? "Mac"
     var policy = KeyPolicy.biometryCurrentSet
     var localOnly = false
+    var hours: Double?
+    var uid: String?
+    var maxUnlocks: Int?
+    var wait: Double?
+    var useGrant = true
 
     init(_ args: [String]) {
         var it = args.dropFirst().makeIterator()
@@ -19,6 +24,17 @@ struct Options {
             case "--label": label = it.next() ?? label
             case "--allow-password": policy = .userPresence
             case "--local-only": localOnly = true
+            case "--hours":
+                guard let text = it.next(), let value = Double(text), value.isFinite else { fail("--hours needs a number, like 1 or 1.5") }
+                hours = value
+            case "--uid": uid = it.next()
+            case "--max-unlocks":
+                guard let text = it.next(), let value = Int(text), value > 0 else { fail("--max-unlocks needs a positive number") }
+                maxUnlocks = value
+            case "--wait":
+                guard let text = it.next(), let value = Double(text), value >= 0 else { fail("--wait needs seconds") }
+                wait = value
+            case "--no-grant": useGrant = false
             default: fail("Unknown option \(arg)")
             }
         }
@@ -136,7 +152,18 @@ func unlock(_ options: Options, port existing: SerialPort? = nil) throws -> Bool
     let authData = HostAuth.authenticatorData(flags: HostAuth.flagUP | HostAuth.flagUV)
     var message = authData
     message.append(Data(SHA256.hash(data: HostAuth.clientData(challenge: challengeText))))
-    let signature = try KeyStore.sign(message, with: stored, reason: "unlock Flipper \(device.uid)")
+    var granted: Data?
+    if options.useGrant {
+        switch GrantClient.sign(challenge: challengeText, uid: device.uid) {
+        case .signed(let der):
+            granted = der
+            print("Using the active grant: no Touch ID needed.")
+        case .refused(let why):
+            print("The active grant did not sign (\(why)); falling back to Touch ID.")
+        case .noGrant: break
+        }
+    }
+    let signature = try granted ?? KeyStore.sign(message, with: stored, reason: "unlock Flipper \(device.uid)")
 
     // A successful unlock restarts the Flipper's shell, so the reply can get cut off.
     // Ask again rather than trusting a missing line.
@@ -182,6 +209,11 @@ func status(_ options: Options) throws {
         }
     } else {
         print("This Mac has no key for it.")
+    }
+    if let grant = GrantClient.status() {
+        print("Unlock grant: active for Flipper \(grant.uid), \(formatDuration(grant.seconds)) left, \(grant.unlocksLeft) unlock(s) left.")
+    } else {
+        print("Unlock grant: none (every unlock needs Touch ID).")
     }
 }
 
@@ -238,15 +270,24 @@ do {
     case "watch": try watch(options)
     case "status": try status(options)
     case "forget": try forget(options)
+    case "grant": try grantCommand(options)
+    case "revoke-grant": revokeGrant()
+    case "grant-serve": grantServe(options)  // started by `grant`, not for direct use
+    case "grant-selftest": try grantSelftest(options)
     case "revoke-all": try revokeAll(options)
     default:
         print(
             """
             usage: flipware-auth <command> [--port PATH]
               enroll [--label NAME] [--allow-password]   Flipper unlocked; hold OK on it to confirm
-              unlock                                      Flipper locked; Touch ID on the Mac
+              unlock [--no-grant]                         Flipper locked; Touch ID on the Mac (or an active grant)
+              grant [--hours N] [--uid UID] [--max-unlocks N]
+                                                          one Touch ID, then unlocks need none for up to N hours
+                                                          (default 1, at most 2; default 25 unlocks)
+              revoke-grant                                end a grant now
+              grant-selftest [--wait SECONDS]             check the grant works on this Mac (no Flipper)
               watch                                       unlock whenever a locked Flipper is plugged in
-              status
+              status                                      includes the grant, if any
               forget [--local-only]                       revoke on the Flipper and delete the local key
               revoke-all                                  revoke every computer on the Flipper
             """)
