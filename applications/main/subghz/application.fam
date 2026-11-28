@@ -25,6 +25,8 @@ App(
         "!subghz_scene_set_serial.c",
         "!subghz_scene_set_type.c",
         "!subghz_compare_test.c",
+        # Protocol plugins: built as their own .fal files, see below.
+        "!plugins",
     ],
     requires=["region"],
     resources="resources",
@@ -99,4 +101,78 @@ App(
     entry_point="subghz_extended_freq",
     sources=["subghz_extended_freq.c"],
     order=650,
+)
+
+# Protocol plugins (.fal on the SD card, loaded by the app when needed).
+# Loader: helpers/subghz_plugins.c. Table of bundles: helpers/subghz_plugins_table.c.
+# Design and how to add a bundle: documentation/SubGhzPlugins.md
+
+App(
+    appid="subghz_plugin_ws1",
+    targets=["f7"],
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="subghz_ws1_plugin_ep",
+    requires=["subghz"],
+    sources=["plugins/ws1/*.c", "plugins/ws_common/*.c"],
+    fal_embedded=True,
+)
+
+App(
+    appid="subghz_plugin_ws2",
+    targets=["f7"],
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="subghz_ws2_plugin_ep",
+    requires=["subghz"],
+    sources=["plugins/ws2/*.c", "plugins/ws_common/*.c"],
+    fal_embedded=True,
+)
+
+App(
+    appid="subghz_plugin_ws3",
+    targets=["f7"],
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="subghz_ws3_plugin_ep",
+    requires=["subghz"],
+    sources=["plugins/ws3/*.c", "plugins/ws_common/*.c"],
+    fal_embedded=True,
+)
+
+App(
+    appid="subghz_plugin_tpms",
+    targets=["f7"],
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="subghz_tpms_plugin_ep",
+    requires=["subghz"],
+    sources=["plugins/tpms/*.c"],
+    fal_embedded=True,
+)
+
+App(
+    appid="subghz_plugin_pager",
+    targets=["f7"],
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="subghz_pager_plugin_ep",
+    requires=["subghz"],
+    sources=["plugins/pager/*.c"],
+    fal_embedded=True,
+)
+
+App(
+    appid="subghz_plugin_x10",
+    targets=["f7"],
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="subghz_x10_plugin_ep",
+    requires=["subghz"],
+    sources=["plugins/x10/*.c"],
+    fal_embedded=True,
+)
+
+App(
+    appid="subghz_plugin_bisecur",
+    targets=["f7"],
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="subghz_bisecur_plugin_ep",
+    requires=["subghz"],
+    sources=["plugins/bisecur/*.c"],
+    fal_embedded=True,
 )
