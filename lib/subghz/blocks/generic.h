@@ -86,6 +86,19 @@ void subghz_block_generic_global_reset(void* p);
 void subghz_block_generic_get_preset_name(const char* preset_name, FuriString* preset_str);
 
 /**
+ * Serialize the header fields every Sub-GHz key file starts with (shared by the serialize
+ * methods of all protocols, including the ones that live in SD card plugins).
+ * @param protocol_name Pointer to a protocol name string
+ * @param flipper_format Pointer to a FlipperFormat instance
+ * @param preset The modulation on which the signal was received, SubGhzRadioPreset
+ * @return Status Error
+ */
+SubGhzProtocolStatus subghz_block_generic_serialize_common(
+    const char* protocol_name,
+    FlipperFormat* flipper_format,
+    SubGhzRadioPreset* preset);
+
+/**
  * Serialize data SubGhzBlockGeneric.
  * @param instance Pointer to a SubGhzBlockGeneric instance
  * @param flipper_format Pointer to a FlipperFormat instance

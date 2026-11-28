@@ -7,6 +7,10 @@
 
 #include <power/power_service/power.h>
 
+#ifndef SUBGHZ_ADD_MANUALLY
+#include "subghz_plugins.h"
+#endif
+
 #define TAG "SubGhzTxRx"
 
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
@@ -22,6 +26,56 @@ static void subghz_txrx_radio_device_power_off(SubGhzTxRx* instance) {
     power_enable_otg(power, false);
     furi_record_close(RECORD_POWER);
 }
+
+#ifndef SUBGHZ_ADD_MANUALLY
+// Protocol plugins. The receiver holds one decoder per protocol, and those decoders run code that
+// lives in the plugins, so the receiver always goes first when the set of plugins changes, and is
+// allocated again afterwards from the new registry.
+static void subghz_txrx_receiver_free_for_plugins(SubGhzTxRx* instance) {
+    instance->decoder_result = NULL;
+    subghz_receiver_free(instance->receiver);
+    instance->receiver = NULL;
+}
+
+static void subghz_txrx_receiver_alloc_with_plugins(SubGhzTxRx* instance) {
+    subghz_environment_set_protocol_registry(
+        instance->environment, subghz_plugins_get_registry(instance->plugins));
+    instance->receiver = subghz_receiver_alloc_init(instance->environment);
+    subghz_worker_set_context(instance->worker, instance->receiver);
+    if(instance->receiver_filter_set) {
+        subghz_receiver_set_filter(instance->receiver, instance->receiver_filter);
+    }
+    if(instance->receiver_ignore_filter_set) {
+        subghz_receiver_set_ignore_filter(instance->receiver, instance->receiver_ignore_filter);
+    }
+    if(instance->rx_callback) {
+        subghz_receiver_set_rx_callback(
+            instance->receiver, instance->rx_callback, instance->rx_callback_context);
+    }
+}
+
+static bool subghz_txrx_plugins_can_change(SubGhzTxRx* instance) {
+    return instance->plugins && instance->txrx_state != SubGhzTxRxStateRx &&
+           instance->txrx_state != SubGhzTxRxStateTx;
+}
+
+/** Load the plugins that suit the modulation of the current preset, unload the others. */
+static void subghz_txrx_plugins_follow_preset(SubGhzTxRx* instance) {
+    if(!subghz_txrx_plugins_can_change(instance)) return;
+    SubGhzPluginsModulation modulation =
+        subghz_plugins_modulation_for_preset(furi_string_get_cstr(instance->preset->name));
+    if(modulation == instance->plugins_modulation) return;
+
+    subghz_txrx_receiver_free_for_plugins(instance);
+    subghz_plugins_select(instance->plugins, modulation);
+    instance->plugins_modulation = modulation;
+    subghz_txrx_receiver_alloc_with_plugins(instance);
+}
+#else
+static void subghz_txrx_plugins_follow_preset(SubGhzTxRx* instance) {
+    UNUSED(instance);
+}
+#endif
 
 SubGhzTxRx* subghz_txrx_alloc(void) {
     SubGhzTxRx* instance = malloc(sizeof(SubGhzTxRx));
@@ -49,8 +103,23 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
         instance->environment, SUBGHZ_ALUTECH_AT_4N_DIR_NAME);
     subghz_environment_set_nice_flor_s_rainbow_table_file_name(
         instance->environment, SUBGHZ_NICE_FLOR_S_DIR_NAME);
+    instance->rx_callback = NULL;
+    instance->rx_callback_context = NULL;
+    instance->receiver_filter_set = false;
+    instance->receiver_ignore_filter_set = false;
+#ifndef SUBGHZ_ADD_MANUALLY
+    // Firmware protocols plus the plugins for the modulation of the default preset
+    instance->plugins = subghz_plugins_alloc(&subghz_protocol_registry);
+    instance->plugins_modulation =
+        subghz_plugins_modulation_for_preset(furi_string_get_cstr(instance->preset->name));
+    subghz_plugins_select(instance->plugins, instance->plugins_modulation);
+    subghz_environment_set_protocol_registry(
+        instance->environment, subghz_plugins_get_registry(instance->plugins));
+#else
+    instance->plugins = NULL;
     subghz_environment_set_protocol_registry(
         instance->environment, (void*)&subghz_protocol_registry);
+#endif
     instance->receiver = subghz_receiver_alloc_init(instance->environment);
 
     subghz_worker_set_overrun_callback(
@@ -85,6 +154,10 @@ void subghz_txrx_free(SubGhzTxRx* instance) {
     subghz_worker_free(instance->worker);
     subghz_receiver_free(instance->receiver);
     subghz_environment_free(instance->environment);
+#ifndef SUBGHZ_ADD_MANUALLY
+    // After the receiver: its decoders run plugin code
+    subghz_plugins_free(instance->plugins);
+#endif
     flipper_format_free(instance->fff_data);
     furi_string_free(instance->preset->name);
     subghz_setting_free(instance->setting);
@@ -115,6 +188,8 @@ void subghz_txrx_set_preset(
     preset->longitude = longitude;
     preset->data = preset_data;
     preset->data_size = preset_data_size;
+
+    subghz_txrx_plugins_follow_preset(instance);
 }
 
 uint8_t*
@@ -377,6 +452,8 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
 void subghz_txrx_rx_start(SubGhzTxRx* instance) {
     furi_assert(instance);
     subghz_txrx_stop(instance);
+    // Picks up a preset that was set while receiving
+    subghz_txrx_plugins_follow_preset(instance);
     subghz_txrx_begin(
         instance,
         subghz_setting_get_preset_data_by_name(
@@ -591,6 +668,17 @@ bool subghz_txrx_load_decoder_by_name_protocol(SubGhzTxRx* instance, const char*
     bool res = false;
     instance->decoder_result =
         subghz_receiver_search_decoder_base_by_name(instance->receiver, name_protocol);
+#ifndef SUBGHZ_ADD_MANUALLY
+    // A saved file can hold a protocol from a plugin that is not loaded (other modulation)
+    if(!instance->decoder_result && subghz_txrx_plugins_can_change(instance) &&
+       subghz_plugins_protocol_needs_load(instance->plugins, name_protocol)) {
+        subghz_txrx_receiver_free_for_plugins(instance);
+        subghz_plugins_ensure_protocol(instance->plugins, name_protocol);
+        subghz_txrx_receiver_alloc_with_plugins(instance);
+        instance->decoder_result =
+            subghz_receiver_search_decoder_base_by_name(instance->receiver, name_protocol);
+    }
+#endif
     if(instance->decoder_result) {
         res = true;
     }
@@ -621,6 +709,8 @@ bool subghz_txrx_protocol_is_transmittable(SubGhzTxRx* instance, bool check_type
 
 void subghz_txrx_receiver_set_filter(SubGhzTxRx* instance, SubGhzProtocolFlag filter) {
     furi_assert(instance);
+    instance->receiver_filter = filter;
+    instance->receiver_filter_set = true;
     subghz_receiver_set_filter(instance->receiver, filter);
 }
 
@@ -628,6 +718,8 @@ void subghz_txrx_receiver_set_ignore_filter(
     SubGhzTxRx* instance,
     SubGhzProtocolFilter ignore_filter) {
     furi_assert(instance);
+    instance->receiver_ignore_filter = ignore_filter;
+    instance->receiver_ignore_filter_set = true;
     subghz_receiver_set_ignore_filter(instance->receiver, ignore_filter);
 }
 
@@ -635,6 +727,8 @@ void subghz_txrx_set_rx_callback(
     SubGhzTxRx* instance,
     SubGhzReceiverCallback callback,
     void* context) {
+    instance->rx_callback = callback;
+    instance->rx_callback_context = context;
     subghz_receiver_set_rx_callback(instance->receiver, callback, context);
 }
 

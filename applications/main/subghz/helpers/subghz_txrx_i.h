@@ -1,6 +1,7 @@
 #pragma once
 
 #include "subghz_txrx.h"
+#include "subghz_plugins.h"
 
 struct SubGhzTxRx {
     SubGhzWorker* worker;
@@ -28,4 +29,15 @@ struct SubGhzTxRx {
     void* need_save_context;
 
     bool debug_pin_state;
+
+    // Protocol plugins (NULL in Add Manually, which only needs firmware protocols)
+    SubGhzPlugins* plugins;
+    SubGhzPluginsModulation plugins_modulation;
+    // What the receiver was last given, to give it again when it is allocated again
+    SubGhzReceiverCallback rx_callback;
+    void* rx_callback_context;
+    SubGhzProtocolFlag receiver_filter;
+    SubGhzProtocolFilter receiver_ignore_filter;
+    bool receiver_filter_set;
+    bool receiver_ignore_filter_set;
 };

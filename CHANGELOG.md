@@ -27,6 +27,7 @@ tag with no section of its own fails the release job.
 ## Unreleased
 
 ### Added
+- Sub-GHz: the weather station (25 protocols), Schrader TPMS, POCSAG pager, X10 and Hormann BiSecur decoders are back, as plugins on the SD card (`apps_assets/subghz/plugins`) that the Sub-GHz app loads for the modulation in use. They cost no firmware flash. Design and how to add a protocol: `documentation/SubGhzPlugins.md` (#47)
 - Install guide (`documentation/Install.md`): qFlipper, SD card, moving over from Momentum and from the official firmware, what an update changes, recovery; and `documentation/ReleaseChecklist.md`, the release candidate and device pass every release goes through (#44)
 - Build: host tests for the host sign-in code, the 125 kHz RFID Add Manually formats, Sub-GHz capture compare and release notes now run in CI on every pull request, and locally with `./fbt test_host` (#40)
 

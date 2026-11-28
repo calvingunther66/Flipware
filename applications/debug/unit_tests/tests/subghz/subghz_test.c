@@ -9,6 +9,9 @@
 #include <flipper_format/flipper_format_i.h>
 #include <lib/subghz/devices/devices.h>
 #include <lib/subghz/devices/cc1101_configs.h>
+#include <flipper_application/plugins/plugin_manager.h>
+#include <loader/firmware_api/firmware_api.h>
+#include <string.h>
 
 #define TAG "SubGhzTest"
 
@@ -704,34 +707,6 @@ MU_TEST(subghz_decoder_hay21_test) {
         "Test decoder " SUBGHZ_PROTOCOL_HAY21_NAME " error\r\n");
 }
 
-MU_TEST(subghz_decoder_solight_te44_test) {
-    mu_assert(
-        subghz_decoder_test(
-            EXT_PATH("unit_tests/subghz/solight_te44_raw.sub"), WS_PROTOCOL_SOLIGHT_TE44_NAME),
-        "Test decoder " WS_PROTOCOL_SOLIGHT_TE44_NAME " error\r\n");
-}
-
-MU_TEST(subghz_decoder_bresser_3ch_v1_test) {
-    mu_assert(
-        subghz_decoder_test(
-            EXT_PATH("unit_tests/subghz/bresser_3ch_raw.sub"), WS_PROTOCOL_BRESSER_3CH_NAME),
-        "Test decoder " WS_PROTOCOL_BRESSER_3CH_NAME " v1 error\r\n");
-}
-
-MU_TEST(subghz_decoder_bresser_3ch_v0_test) {
-    mu_assert(
-        subghz_decoder_test(
-            EXT_PATH("unit_tests/subghz/bresser_3ch_v0_raw.sub"), WS_PROTOCOL_BRESSER_3CH_NAME),
-        "Test decoder " WS_PROTOCOL_BRESSER_3CH_NAME " v0 error\r\n");
-}
-
-MU_TEST(subghz_decoder_vauno_en8822c_test) {
-    mu_assert(
-        subghz_decoder_test(
-            EXT_PATH("unit_tests/subghz/vauno_en8822c.sub"), WS_PROTOCOL_VAUNO_EN8822C_NAME),
-        "Test decoder " WS_PROTOCOL_VAUNO_EN8822C_NAME " error\r\n");
-}
-
 //test encoders
 MU_TEST(subghz_encoder_princeton_test) {
     mu_assert(
@@ -889,13 +864,6 @@ MU_TEST(subghz_encoder_mastercode_test) {
         "Test encoder " SUBGHZ_PROTOCOL_MASTERCODE_NAME " error\r\n");
 }
 
-MU_TEST(subghz_decoder_acurite_592txr_test) {
-    mu_assert(
-        subghz_decoder_test(
-            EXT_PATH("unit_tests/subghz/acurite_592txr.sub"), WS_PROTOCOL_ACURITE_592TXR_NAME),
-        "Test decoder " WS_PROTOCOL_ACURITE_592TXR_NAME " error\r\n");
-}
-
 MU_TEST(subghz_encoder_dickert_test) {
     mu_assert(
         subghz_encoder_test(EXT_PATH("unit_tests/subghz/dickert_mahs.sub")),
@@ -942,6 +910,177 @@ MU_TEST(subghz_encoder_marantec24_test) {
     mu_assert(
         subghz_encoder_test(EXT_PATH("unit_tests/subghz/marantec24.sub")),
         "Test encoder " SUBGHZ_PROTOCOL_MARANTEC24_NAME " error\r\n");
+}
+
+/* Decoders that live in SD card plugins (applications/main/subghz/plugins). The plugins are loaded
+ * the way the Sub-GHz app loads them, and all their protocols go into a receiver of their own,
+ * next to the firmware ones, so the tests also cover the plugins not tripping over each other. */
+
+#define SUBGHZ_PLUGIN_APP_ID      "subghz_protocol_plugin"
+#define SUBGHZ_PLUGIN_API_VERSION 1
+#define SUBGHZ_PLUGIN_COUNT       7
+
+// Same layout as SubGhzProtocolPlugin in applications/main/subghz/plugins/subghz_protocol_plugin.h
+typedef struct {
+    const SubGhzProtocol* const* items;
+    size_t count;
+} SubGhzTestPlugin;
+
+static const char* const subghz_test_plugin_files[SUBGHZ_PLUGIN_COUNT] = {
+    EXT_PATH("apps_assets/subghz/plugins/subghz_plugin_ws1.fal"),
+    EXT_PATH("apps_assets/subghz/plugins/subghz_plugin_ws2.fal"),
+    EXT_PATH("apps_assets/subghz/plugins/subghz_plugin_ws3.fal"),
+    EXT_PATH("apps_assets/subghz/plugins/subghz_plugin_tpms.fal"),
+    EXT_PATH("apps_assets/subghz/plugins/subghz_plugin_x10.fal"),
+    EXT_PATH("apps_assets/subghz/plugins/subghz_plugin_pager.fal"),
+    EXT_PATH("apps_assets/subghz/plugins/subghz_plugin_bisecur.fal"),
+};
+
+typedef struct {
+    PluginManager* managers[SUBGHZ_PLUGIN_COUNT];
+    const SubGhzProtocol** items;
+    SubGhzProtocolRegistry registry;
+    SubGhzEnvironment* environment;
+    SubGhzReceiver* receiver;
+    // What the receiver reported
+    const char* expect_name;
+    uint16_t expect_count;
+    uint16_t other_count;
+} SubGhzTestPluginSet;
+
+static void subghz_test_plugin_rx_callback(
+    SubGhzReceiver* receiver,
+    SubGhzProtocolDecoderBase* decoder_base,
+    void* context) {
+    SubGhzTestPluginSet* set = context;
+    if(strcmp(decoder_base->protocol->name, set->expect_name) == 0) {
+        set->expect_count++;
+    } else {
+        set->other_count++;
+    }
+    subghz_receiver_reset(receiver);
+}
+
+static SubGhzTestPluginSet* subghz_test_plugin_set_alloc(void) {
+    SubGhzTestPluginSet* set = malloc(sizeof(SubGhzTestPluginSet));
+    memset(set, 0, sizeof(SubGhzTestPluginSet));
+
+    size_t count = subghz_protocol_registry_count(&subghz_protocol_registry);
+    const SubGhzTestPlugin* plugins[SUBGHZ_PLUGIN_COUNT] = {0};
+    for(size_t i = 0; i < SUBGHZ_PLUGIN_COUNT; i++) {
+        set->managers[i] = plugin_manager_alloc(
+            SUBGHZ_PLUGIN_APP_ID, SUBGHZ_PLUGIN_API_VERSION, firmware_api_interface);
+        PluginManagerError error =
+            plugin_manager_load_single(set->managers[i], subghz_test_plugin_files[i]);
+        if(error != PluginManagerErrorNone) {
+            FURI_LOG_E(TAG, "Cannot load %s (error %d)", subghz_test_plugin_files[i], error);
+            continue;
+        }
+        plugins[i] = plugin_manager_get_ep(set->managers[i], 0);
+        count += plugins[i]->count;
+    }
+
+    set->items = malloc(count * sizeof(SubGhzProtocol*));
+    size_t n = 0;
+    for(size_t i = 0; i < subghz_protocol_registry_count(&subghz_protocol_registry); i++) {
+        set->items[n++] = subghz_protocol_registry_get_by_index(&subghz_protocol_registry, i);
+    }
+    for(size_t i = 0; i < SUBGHZ_PLUGIN_COUNT; i++) {
+        if(!plugins[i]) continue;
+        for(size_t j = 0; j < plugins[i]->count; j++) {
+            set->items[n++] = plugins[i]->items[j];
+        }
+    }
+    const SubGhzProtocolRegistry registry = {.items = set->items, .size = n};
+    memcpy(&set->registry, &registry, sizeof(registry));
+
+    set->environment = subghz_environment_alloc();
+    subghz_environment_set_protocol_registry(set->environment, &set->registry);
+    set->receiver = subghz_receiver_alloc_init(set->environment);
+    subghz_receiver_set_filter(set->receiver, SubGhzProtocolFlag_Decodable);
+    subghz_receiver_set_rx_callback(set->receiver, subghz_test_plugin_rx_callback, set);
+    return set;
+}
+
+static void subghz_test_plugin_set_free(SubGhzTestPluginSet* set) {
+    // The receiver first: its decoders run code from the plugins
+    subghz_receiver_free(set->receiver);
+    subghz_environment_free(set->environment);
+    for(size_t i = 0; i < SUBGHZ_PLUGIN_COUNT; i++) {
+        plugin_manager_free(set->managers[i]);
+    }
+    free(set->items);
+    free(set);
+}
+
+static bool subghz_test_plugin_has_protocol(SubGhzTestPluginSet* set, const char* name) {
+    return subghz_receiver_search_decoder_base_by_name(set->receiver, name) != NULL;
+}
+
+// Feeds a RAW capture to every decoder and reports whether `name` decoded it
+static bool
+    subghz_test_plugin_decode(SubGhzTestPluginSet* set, const char* path, const char* name) {
+    set->expect_name = name;
+    set->expect_count = 0;
+    set->other_count = 0;
+    subghz_receiver_reset(set->receiver);
+    uint32_t test_start = furi_get_tick();
+
+    SubGhzFileEncoderWorker* worker = subghz_file_encoder_worker_alloc();
+    if(subghz_file_encoder_worker_start(worker, path, NULL)) {
+        // the worker needs a file in order to open and read part of the file
+        furi_delay_ms(100);
+        while(furi_get_tick() - test_start < TEST_TIMEOUT) {
+            LevelDuration level_duration = subghz_file_encoder_worker_get_level_duration(worker);
+            if(level_duration_is_reset(level_duration)) break;
+            // Yield, to load data inside the worker
+            furi_thread_yield();
+            subghz_receiver_decode(
+                set->receiver,
+                level_duration_get_level(level_duration),
+                level_duration_get_duration(level_duration));
+        }
+        furi_delay_ms(10);
+    }
+    if(subghz_file_encoder_worker_is_running(worker)) {
+        subghz_file_encoder_worker_stop(worker);
+    }
+    subghz_file_encoder_worker_free(worker);
+    FURI_LOG_D(TAG, "%s: %d decoded, %d by others", name, set->expect_count, set->other_count);
+    return set->expect_count > 0;
+}
+
+MU_TEST(subghz_plugins_decoders_test) {
+    SubGhzTestPluginSet* set = subghz_test_plugin_set_alloc();
+
+    // Every one of the 29 decoders is there, plus the firmware ones
+    static const char* const names[] = {
+        "inFactory-TH",  "ThermoPRO-TX4",  "Nexus-TH",    "GT-WT02",         "GT-WT03",
+        "Acurite-606TX", "Acurite-609TXC", "Acurite-986", "Bresser-3CH",     "LaCrosse_TX",
+        "TX141THBv2",    "Oregon2",        "Oregon3",     "Acurite 592TXR",  "Ambient_Weather",
+        "Solight TE44",  "Auriol HG06061", "Oregon-v1",   "TX8300",          "Wendox W6726",
+        "Auriol AHFL",   "Kedsum-TH",      "EMOS E601x",  "Acurite 5n1",     "Vauno-EN8822C",
+        "Schrader GG4",  "POCSAG",         "X10",         "Hormann BiSecur",
+    };
+    for(size_t i = 0; i < COUNT_OF(names); i++) {
+        mu_assert(subghz_test_plugin_has_protocol(set, names[i]), names[i]);
+    }
+    mu_assert(subghz_test_plugin_has_protocol(set, "Princeton"), "firmware protocols are missing");
+
+    mu_check(subghz_test_plugin_decode(
+        set, EXT_PATH("unit_tests/subghz/bresser_3ch_raw.sub"), "Bresser-3CH"));
+    mu_check(subghz_test_plugin_decode(
+        set, EXT_PATH("unit_tests/subghz/bresser_3ch_v0_raw.sub"), "Bresser-3CH"));
+    mu_check(subghz_test_plugin_decode(
+        set, EXT_PATH("unit_tests/subghz/solight_te44_raw.sub"), "Solight TE44"));
+    mu_check(subghz_test_plugin_decode(
+        set, EXT_PATH("unit_tests/subghz/vauno_en8822c_raw.sub"), "Vauno-EN8822C"));
+    mu_check(subghz_test_plugin_decode(
+        set, EXT_PATH("unit_tests/subghz/acurite_592txr.sub"), "Acurite 592TXR"));
+    mu_check(subghz_test_plugin_decode(
+        set, EXT_PATH("unit_tests/subghz/hormann_bisecur_1C84A55B_raw.sub"), "Hormann BiSecur"));
+
+    subghz_test_plugin_set_free(set);
 }
 
 MU_TEST(subghz_random_test) {
@@ -1001,10 +1140,7 @@ MU_TEST_SUITE(subghz) {
     MU_RUN_TEST(subghz_decoder_feron_test);
     MU_RUN_TEST(subghz_decoder_legrand_test);
     MU_RUN_TEST(subghz_decoder_marantec24_test);
-    // MU_RUN_TEST(subghz_decoder_solight_te44_test);
-    // MU_RUN_TEST(subghz_decoder_bresser_3ch_v1_test);
-    // MU_RUN_TEST(subghz_decoder_bresser_3ch_v0_test);
-    // MU_RUN_TEST(subghz_decoder_vauno_en8822c_test);
+    // Weather station, TPMS, POCSAG, X10 and BiSecur decoders: subghz_plugins_decoders_test
 
     MU_RUN_TEST(subghz_encoder_princeton_test);
     MU_RUN_TEST(subghz_encoder_came_test);
@@ -1032,7 +1168,6 @@ MU_TEST_SUITE(subghz) {
     MU_RUN_TEST(subghz_encoder_holtek_ht12x_test);
     MU_RUN_TEST(subghz_encoder_dooya_test);
     MU_RUN_TEST(subghz_encoder_mastercode_test);
-    MU_RUN_TEST(subghz_decoder_acurite_592txr_test);
     MU_RUN_TEST(subghz_encoder_dickert_test);
     MU_RUN_TEST(subghz_encoder_feron_test);
     MU_RUN_TEST(subghz_encoder_roger_test);
@@ -1042,6 +1177,7 @@ MU_TEST_SUITE(subghz) {
     MU_RUN_TEST(subghz_encoder_reversrb2_test);
     MU_RUN_TEST(subghz_encoder_legrand_test);
 
+    MU_RUN_TEST(subghz_plugins_decoders_test);
     MU_RUN_TEST(subghz_random_test);
     subghz_test_deinit();
 }
