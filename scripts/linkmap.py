@@ -123,8 +123,10 @@ def parse_map(lines):
             if m:
                 add("*fill*", int(m.group(1), 16), int(m.group(2), 16), "(padding)")
                 continue
+            # A long section name sits alone on its line and the numbers follow
+            # on the next one. Custom sections (COMMON, MB_MEM2) have no dot.
             m = _INPUT_NAME.match(line)
-            if m and m.group(1).startswith("."):
+            if m:
                 pending_input = m.group(1)
             continue
 
@@ -174,7 +176,8 @@ def summarize(sections):
     for s in sections:
         group, obj = classify(s["file"])
         groups[group] = groups.get(group, 0) + s["size"]
-        key = f"{group}:{obj}"
+        # A loose object's path already starts with its group; say it once.
+        key = obj if obj.startswith(group + "/") else f"{group}:{obj}"
         objects[key] = objects.get(key, 0) + s["size"]
     return groups, objects
 
@@ -232,8 +235,8 @@ def main(argv=None):
     print()
     for name, size in sorted(objects.items(), key=lambda kv: -kv[1])[: args.top]:
         print(f"{size:>10,}  {name}")
+    cref = parse_cref(lines) if args.why else {}
     for sym in args.why:
-        cref = parse_cref(lines)
         if sym in cref:
             defined, users = cref[sym]
             print(f"\n{sym} is defined in {defined}, used by:")

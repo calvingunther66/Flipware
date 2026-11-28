@@ -407,6 +407,24 @@ class LinkMapTest(unittest.TestCase):
         self.assertNotIn("(toolchain)", "".join(groups))
         self.assertEqual(objects["libnfc.a:nfc_b.o"], 0x200)
 
+    def test_loose_object_name_is_not_repeated(self):
+        sections = self.linkmap.parse_map(SAMPLE_MAP.splitlines(True))
+        _, objects = self.linkmap.summarize(sections)
+        self.assertIn("applications/services/gui/gui.o", objects)
+        self.assertNotIn("applications/services/gui:applications/services/gui/gui.o", objects)
+
+    def test_wrapped_section_name_without_a_dot(self):
+        text = """\
+Linker script and memory map
+
+.text           0x0000000008000000      0x100
+ CUSTOM_SECTION_WITH_A_LONG_NAME_THAT_WRAPS
+                0x0000000008000000      0x100 build/f7-firmware-C/lib/libfoo.a(foo.o)
+"""
+        sections = self.linkmap.parse_map(text.splitlines(True))
+        self.assertEqual([(s["section"], s["size"]) for s in sections],
+                         [("CUSTOM_SECTION_WITH_A_LONG_NAME_THAT_WRAPS", 0x100)])
+
     def test_noload_sections_and_ram_buffers_are_not_flash(self):
         sections = self.linkmap.parse_map(SAMPLE_MAP.splitlines(True))
         self.assertFalse([s for s in sections if s["output"] == ".free_flash"])
