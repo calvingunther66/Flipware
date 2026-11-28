@@ -34,12 +34,13 @@ without another fingerprint. Then it ends by itself.
   (mode 0600, same user only). The private key stays in the Secure Enclave.
 - **Fails closed.** It ends at the deadline (a clock that keeps counting while the Mac sleeps),
   after `--max-unlocks` unlocks (default 25), on `revoke-grant`, on logout or restart, or if the
-  system drops the approval. After that, `unlock` asks for Touch ID again.
+  system drops the approval (a locked screen may do that). Ending means the background process
+  exits; after that, `unlock` asks for Touch ID again.
 - `flipware-auth status` shows the grant and the time left. Every use is logged to
   `~/Library/Application Support/Flipware/hostauth/grant.log`.
 - `unlock --no-grant` ignores an active grant and asks for Touch ID.
 - `grant-selftest [--wait 330]` checks, with no Flipper, that one approval keeps signing (also
-  past 5 minutes) and stops after it is ended. Run it once after building.
+  past 5 minutes) and belongs to that process only. Run it once after building.
 
 While a grant is active, any program running as you can unlock a Flipper that is plugged in.
 Only grant when you want that.

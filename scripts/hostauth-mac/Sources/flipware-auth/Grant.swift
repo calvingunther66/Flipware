@@ -9,9 +9,12 @@
 //   sends it the Flipper's challenge; it checks the challenge is an unlock for the enrolled
 //   Flipper, signs it with the approved context and returns the signature. It never signs
 //   anything else, and the private key still never leaves the Secure Enclave.
-// - When the time is up, the unlock count is used up, `revoke-grant` is run, or the process
-//   dies (logout, reboot, kill), the context is invalidated and the Secure Enclave asks for
-//   Touch ID again. There is no grant file or Keychain item to steal, copy or forget to delete.
+// - The approval only exists inside that process. When the time is up, the unlock count is
+//   used up, `revoke-grant` is run, or the process dies (logout, reboot, kill), the process
+//   exits and the approval goes with it: the next unlock asks for Touch ID again. (Measured
+//   on a Mac: LAContext.invalidate() alone does NOT stop a key object already bound to that
+//   context from signing, so the process exit is what ends the grant, not invalidate().)
+//   There is no grant file or Keychain item to steal, copy or forget to delete.
 //   The Flipper is unchanged: it can't tell a granted unlock from a fresh Touch ID.
 import CryptoKit
 import Darwin
@@ -95,10 +98,13 @@ enum Grant {
         setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
     }
 
-    static func readLine(_ fd: Int32, limit: Int = 1024) -> String? {
+    /// Reads one line. `within` is a total limit, so a peer that trickles bytes can't hold the server.
+    static func readLine(_ fd: Int32, limit: Int = 1024, within: TimeInterval = 3) -> String? {
         var data = [UInt8]()
         var byte: UInt8 = 0
+        let start = monotonicNow()
         while data.count < limit {
+            if monotonicNow() - start > within { return nil }
             let n = Darwin.read(fd, &byte, 1)
             if n <= 0 { return nil }
             if byte == 10 { return String(decoding: data, as: UTF8.self) }
@@ -169,7 +175,7 @@ final class GrantServer {
             if ready <= 0 { continue }
             let client = accept(listener, nil, nil)
             if client < 0 { continue }
-            Grant.setTimeout(client, seconds: 5)
+            Grant.setTimeout(client, seconds: 1)  // per read; readLine also caps the whole request at 3 s
             handle(client)
             close(client)
         }
@@ -207,6 +213,7 @@ final class GrantServer {
 
     /// Signs one WebAuthn unlock assertion for the enrolled Flipper, and nothing else.
     private func sign(challenge text: String) -> String {
+        guard Grant.monotonicNow() < deadline else { return "error grant-expired" }
         guard unlocksLeft > 0 else { return "error unlock-limit-reached" }
         guard text.utf8.count == 94,
             text.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }),
@@ -221,7 +228,7 @@ final class GrantServer {
             unlocksLeft -= 1
             return "ok \(signature.hexString)"
         } catch {
-            // The approval is gone (system invalidated it): fail closed, never prompt unattended
+            // The approval is gone (the system dropped it): fail closed, never prompt unattended
             revoked = true
             Grant.log("approval lost: \(error)")
             return "error approval-lost"
@@ -434,7 +441,10 @@ func revokeGrant() {
 
 /// `flipware-auth grant-selftest [--wait SECONDS]`: checks on this Mac, with no Flipper, that
 /// one Touch ID approval keeps working (also past the 5 minute LAContext reuse limit), and
-/// stops working after invalidate(). Uses a throwaway Secure Enclave key that is not stored.
+/// that the approval belongs to that one context: a fresh context can't sign without a new
+/// prompt. (invalidate() is not tested as a stop: on macOS a key already bound to the context
+/// keeps signing, so the grant ends by its process exiting.) The throwaway Secure Enclave
+/// key is not stored.
 func grantSelftest(_ options: Options) throws {
     guard SecureEnclave.isAvailable else { throw KeyStoreError.noSecureEnclave }
     let access = try KeyStore.accessControl(policy: options.policy)
@@ -468,8 +478,19 @@ func grantSelftest(_ options: Options) throws {
         sleep(UInt32(wait))
         ok = trySign("sign after \(Int(wait)) s", expectSuccess: true) && ok
     }
+    // A different context has no approval: with prompts disallowed it must refuse
+    let other = LAContext()
+    other.interactionNotAllowed = true
+    if let fresh = try? SecureEnclave.P256.Signing.PrivateKey(
+        dataRepresentation: probe.dataRepresentation, authenticationContext: other)
+    {
+        let refused = (try? fresh.signature(for: Data("no approval".utf8))) == nil
+        print("\(refused ? "PASS" : "FAIL"): a context without approval \(refused ? "was refused" : "signed")")
+        ok = refused && ok
+    } else {
+        print("PASS: a context without approval could not even load the key")
+    }
     context.invalidate()
-    ok = trySign("sign after invalidate()", expectSuccess: false) && ok
     print(ok ? "Self-test passed: the grant approach works on this Mac." : "Self-test FAILED: do not rely on `grant` on this Mac.")
     if !ok { exit(1) }
 }
