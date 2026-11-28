@@ -520,6 +520,7 @@ static void storage_cli_md5(PipeSide* pipe, FuriString* path, FuriString* args) 
     furi_record_close(RECORD_STORAGE);
 }
 
+#ifdef FURI_DEBUG
 // Demonstrates the expansion-module compute-offload pipeline end to end:
 // reads the whole file into memory and computes its CRC32 via coproc_run(),
 // which offloads to a connected module's Coproc channel if one is present,
@@ -696,6 +697,7 @@ static void storage_cli_heatshrink(PipeSide* pipe, FuriString* path, FuriString*
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);
 }
+#endif
 
 static bool tar_extract_file_callback(const char* name, bool is_directory, void* context) {
     UNUSED(context);
@@ -767,16 +769,20 @@ static const StorageCliCommand storage_cli_commands[] = {
         "md5 hash of the file",
         &storage_cli_md5,
     },
+#ifdef FURI_DEBUG
     {
         "crc32",
         "crc32 of the file, offloaded to a connected expansion module if available",
         &storage_cli_crc32,
     },
+#endif
+#ifdef FURI_DEBUG
     {
         "heatshrink",
         "heatshrink round trip of a small file (<=4000 B) via coproc, checked against local",
         &storage_cli_heatshrink,
     },
+#endif
     {
         "stat",
         "info about file or dir",
