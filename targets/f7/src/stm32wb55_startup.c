@@ -112,8 +112,10 @@ typedef void (*element_t)(void);
 
 /** System initialization vector. Contains: main stack end address, 15 pointers
  * to unmask-able ISR and 63 to mask-able ISR. */
+// `used`: nothing in the code refers to the table, only the linker script does
+// (KEEP), so a link-time optimized build would otherwise drop it.
 PLACE_IN_SECTION(".isr_vector")
-const element_t reset_vector[] = {
+__attribute__((used)) const element_t reset_vector[] = {
     /* Main stack top */
     (element_t)&_stack_end,
     /* 15 Unmaskable ISR */
