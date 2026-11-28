@@ -32,14 +32,6 @@ else:
         ],
     )
 
-# Link-time optimization (roadmap 2.2 trial). Fat objects keep ar/ranlib working;
-# the LTO bytecode in them is what the linker plugin uses.
-if ENV["COMPACT"] and ENV["IS_BASE_FIRMWARE"]:
-    ENV.Append(
-        CCFLAGS=["-flto", "-ffat-lto-objects"],
-        LINKFLAGS=["-flto", "-fuse-linker-plugin"],
-    )
-
 ENV.AppendUnique(
     LINKFLAGS=[
         "-specs=nano.specs",
