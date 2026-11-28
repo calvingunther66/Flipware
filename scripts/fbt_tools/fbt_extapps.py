@@ -313,6 +313,8 @@ def _validate_app_imports(target, source, env):
             "js_event_loop_get_loop",
             "js_gui_make_view_factory",
             "js_gui_font_declaration",
+            # mJS is built into js_app and cli_js, which export it to their plugins
+            "mjs_",
         ),
         # metroflip_api_table
         (
