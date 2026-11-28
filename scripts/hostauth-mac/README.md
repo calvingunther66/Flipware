@@ -16,10 +16,33 @@ swift build -c release
 .build/release/flipware-auth unlock                         # Flipper locked; Touch ID on the Mac
 .build/release/flipware-auth watch                          # unlock whenever a locked Flipper is plugged in
 .build/release/flipware-auth status
+.build/release/flipware-auth grant --hours 1.5              # one Touch ID, then unlocks need none for 1.5 h (max 2)
+.build/release/flipware-auth revoke-grant                   # end the grant now
 .build/release/flipware-auth forget                         # revoke on the Flipper, delete the local key
 .build/release/flipware-auth forget --local-only            # delete the local key only (lost Flipper)
 .build/release/flipware-auth revoke-all                     # revoke every computer on the Flipper
 ```
+
+## Timed grant (unlock without a fingerprint each time)
+
+`flipware-auth grant [--hours N]` asks for Touch ID once. For up to N hours (default 1, at
+most 2), `flipware-auth unlock` and `watch` (yours, or run by an agent as you) sign in
+without another fingerprint. Then it ends by itself.
+
+- **Nothing is stored.** A small background process keeps the one approval in memory and signs
+  only unlock assertions for your enrolled Flipper, through a Unix socket in the key folder
+  (mode 0600, same user only). The private key stays in the Secure Enclave.
+- **Fails closed.** It ends at the deadline (a clock that keeps counting while the Mac sleeps),
+  after `--max-unlocks` unlocks (default 25), on `revoke-grant`, on logout or restart, or if the
+  system drops the approval. After that, `unlock` asks for Touch ID again.
+- `flipware-auth status` shows the grant and the time left. Every use is logged to
+  `~/Library/Application Support/Flipware/hostauth/grant.log`.
+- `unlock --no-grant` ignores an active grant and asks for Touch ID.
+- `grant-selftest [--wait 330]` checks, with no Flipper, that one approval keeps signing (also
+  past 5 minutes) and stops after it is ended. Run it once after building.
+
+While a grant is active, any program running as you can unlock a Flipper that is plugged in.
+Only grant when you want that.
 
 Options:
 - `--port /dev/cu.usbmodemflip_NAME1`: which Flipper to use. By default, the only one found.

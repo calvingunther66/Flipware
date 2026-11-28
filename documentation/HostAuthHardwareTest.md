@@ -53,6 +53,19 @@ Mac-only key policy (needs a fingerprint change, so do these last):
 | A14 | Unlocked, no key enrolled (`fa forget` first if needed): `fa enroll --allow-password`; lock; `fa unlock`; use the login password | Works, with the login-password prompt. Then unlock the Flipper and run `fa forget`. |
 | A15 | `fa enroll` (default policy), then add a Touch ID finger in System Settings | `fa status` says the fingers changed; `fa unlock` explains the invalidated key instead of failing opaquely. Unlock with the PIN, `fa forget`, `fa enroll` recovers. |
 
+Timed grant (one Touch ID covers unlocks for up to 2 hours). Start with `fa grant-selftest --wait 330`, which needs no Flipper and must print `Self-test passed`:
+
+| # | Do | Expect |
+| --- | --- | --- |
+| A16 | Key enrolled, Flipper unlocked. `fa grant --hours 0.1`, approve Touch ID | `Grant active until <time> (6 min).` `fa status` shows the grant with about 6 min and 25 unlocks left. |
+| A17 | Lock the Flipper, `fa unlock` | `Using the active grant: no Touch ID needed.` then `unlocked`, with no prompt. Repeat lock and unlock once more. `fa status` shows 23 left. |
+| A18 | `fa unlock --no-grant` (locked) | Touch ID prompt as usual. |
+| A19 | Wait for the grant to run out (6 min), lock, `fa unlock` | No grant message; Touch ID prompt. `fa status` says `Unlock grant: none`. |
+| A20 | `fa grant --hours 1`, then `fa revoke-grant`, lock, `fa unlock` | `Grant revoked.`, then a Touch ID prompt. |
+| A21 | `fa grant --hours 3` | Refused: `out of range ... at most 2.0`. |
+| A22 | `fa grant --max-unlocks 1`, unlock twice | The first uses the grant; the second says `unlock-limit-reached`, falls back to Touch ID. |
+| A23 | `fa grant`, then lock the Mac screen for a minute, unlock the Mac, lock the Flipper, `fa unlock` | Either it still uses the grant, or it says the grant did not sign and falls back to Touch ID. Note which. It must never fail without a prompt. |
+
 ## B. Windows or Linux (`scripts/hostauth-fido2`)
 
 ```sh
