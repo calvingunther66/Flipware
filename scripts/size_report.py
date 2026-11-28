@@ -299,7 +299,7 @@ def check_gates(current, delta, budget, growth_allowed):
 
 def _code(name):
     """A symbol name safe to put in a markdown table cell inside backticks."""
-    clean = re.sub(r"[^A-Za-z0-9_.$@<>:+*&~!,()\[\] -]", "?", name)
+    clean = re.sub(r"[^A-Za-z0-9_.$@<>:+*&~!,()\[\]/ -]", "?", name)
     if len(clean) > 80:
         clean = clean[:77] + "..."
     return f"`{clean}`"
