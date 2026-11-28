@@ -237,6 +237,15 @@ jobs:
           else
             echo "::warning::No linker map found; the report has no flash-by-library table."
           fi
+          if [ -n "$map" ] ; then
+            echo "::group::Linker map: biggest libraries, objects and who pulls in float and strtod code"
+            python3 scripts/linkmap.py "$map" --top 80 \
+              --why _strtod_l --why strtod --why strtof --why atof --why powf --why pow \
+              --why _printf_float --why _scanf_float --why __ssprint_r --why _svfprintf_r \
+              --why _vfprintf_r --why __d2b --why __ieee754_pow --why __aeabi_dmul --why __aeabi_ddiv \
+              --why __aeabi_fmul --why __aeabi_fdiv --why __aeabi_f2d --why __aeabi_d2f || true
+            echo "::endgroup::"
+          fi
           status=0
           python3 scripts/size_report.py --elf "$elf" --update-dir "$update_dir" $map_args \
             --budget "$budget" --target "$TARGET" $growth \
