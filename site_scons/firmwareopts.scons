@@ -44,6 +44,9 @@ ENV.AppendUnique(
         "-n",
         "-Xlinker",
         "-Map=${TARGET}.map",
+        # Cross reference table at the end of the map: which file uses a symbol
+        # (scripts/linkmap.py --why). Only the map grows, not the firmware.
+        "-Wl,--cref",
         "-T${LINKER_SCRIPT_PATH}",
     ],
 )

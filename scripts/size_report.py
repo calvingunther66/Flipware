@@ -7,7 +7,11 @@ free below the radio stack, and how that compares with an earlier build.
 
   size_report.py --elf firmware.elf --update-dir dist/f7-C/f7-update-X \\
       --budget .github/size_budget.json [--baseline size-f7.json] \\
-      [--growth-allowed] [--target f7] --out-json size-f7.json --out-md size.md
+      [--map firmware.elf.map] [--growth-allowed] [--target f7] \\
+      --out-json size-f7.json --out-md size.md
+
+With --map the report also says which library or directory each byte of flash
+came from (see scripts/linkmap.py).
 
 Exit status is 1 when a gate in the budget file fails, after the report is
 written. Only the Python standard library is used, so it runs anywhere.
@@ -19,6 +23,9 @@ import os
 import re
 import struct
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import linkmap  # noqa: E402  (same folder; reads the linker map)
 
 FLASH_START = 0x08000000
 FLASH_END = 0x08100000
@@ -215,6 +222,19 @@ def build_report(elf, radio_address, target="f7", dfu_size=None):
     return report
 
 
+MAP_TOP_OBJECTS = 40
+
+
+def add_map(report, map_lines):
+    """Add flash attribution from a linker map: bytes per library or directory,
+    and the biggest object files."""
+    groups, objects = linkmap.summarize(linkmap.parse_map(map_lines))
+    top = sorted(objects.items(), key=lambda kv: (-kv[1], kv[0]))[:MAP_TOP_OBJECTS]
+    report["flash_groups"] = groups
+    report["flash_objects"] = dict(top)
+    return report
+
+
 def compare(current, baseline):
     """Differences between two reports (current minus baseline)."""
     delta = {
@@ -240,6 +260,16 @@ def compare(current, baseline):
             changes.append((name, before.get(name, 0), after.get(name, 0), change))
     delta["symbols_grown"] = sorted(changes, key=lambda c: (-c[3], c[0]))
     delta["symbols_shrunk"] = sorted(changes, key=lambda c: (c[3], c[0]))
+
+    if current.get("flash_groups") is not None:
+        was = baseline.get("flash_groups") or {}
+        delta["flash_groups"] = {
+            name: size - was.get(name, 0)
+            for name, size in current["flash_groups"].items()
+        }
+        for name in was:
+            delta["flash_groups"].setdefault(name, -was[name])
+        delta["has_group_baseline"] = bool(was)
     return delta
 
 
@@ -281,6 +311,9 @@ def _kib(n):
 
 def _signed(n):
     return f"{n:+,}"
+
+
+MAP_TOP_GROUPS = 40
 
 
 def render_markdown(current, delta, problems, baseline_note, budget):
@@ -333,6 +366,34 @@ def render_markdown(current, delta, problems, baseline_note, budget):
         )
     out.append("\n</details>\n")
 
+    if current.get("flash_groups"):
+        groups = current["flash_groups"]
+        total = sum(groups.values())
+        changes = (
+            (delta or {}).get("flash_groups")
+            if (delta or {}).get("has_group_baseline")
+            else None
+        )
+        out.append(
+            f"<details open><summary>Flash by library or directory (from the linker map, {total:,} B)</summary>\n"
+        )
+        out.append("| Where | Flash | Share | Change |")
+        out.append("|---|---:|---:|---:|")
+        for name, size in sorted(groups.items(), key=lambda kv: (-kv[1], kv[0]))[
+            :MAP_TOP_GROUPS
+        ]:
+            change = _signed(changes.get(name, 0)) if changes is not None else "n/a"
+            out.append(
+                f"| {_code(name)} | {size:,} | {100 * size / total:.1f}% | {change} |"
+            )
+        out.append("\n</details>\n")
+        out.append("<details><summary>Biggest object files</summary>\n")
+        out.append("| Object | Flash |")
+        out.append("|---|---:|")
+        for name, size in list(current["flash_objects"].items())[:20]:
+            out.append(f"| {_code(name)} | {size:,} |")
+        out.append("\n</details>\n")
+
     if delta:
         grown = [c for c in delta["symbols_grown"] if c[3] > 0][:10]
         shrunk = [c for c in delta["symbols_shrunk"] if c[3] < 0][:5]
@@ -370,6 +431,9 @@ def main(argv=None):
         default="the earlier build",
         help="what the baseline is, for the report",
     )
+    parser.add_argument(
+        "--map", help="linker map (firmware.elf.map) to attribute flash"
+    )
     parser.add_argument("--growth-allowed", action="store_true")
     parser.add_argument("--target", default="f7")
     parser.add_argument("--out-json", required=True)
@@ -382,6 +446,9 @@ def main(argv=None):
     dfu_size = os.path.getsize(dfu_path) if os.path.exists(dfu_path) else None
 
     current = build_report(read_elf(args.elf), radio_address, args.target, dfu_size)
+    if args.map:
+        with open(args.map, errors="replace") as f:
+            add_map(current, f.readlines())
     budget = load_json(args.budget)
 
     delta = None

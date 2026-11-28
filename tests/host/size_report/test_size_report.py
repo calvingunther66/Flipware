@@ -352,5 +352,84 @@ class CommandLine(unittest.TestCase):
                 self.assertIn("below the minimum", f.read())
 
 
+SAMPLE_MAP = """\
+Discarded input sections
+
+ .text          0x0000000008000000        0x0 build/f7-firmware-C/lib/foo.o
+
+Linker script and memory map
+
+.text           0x0000000008000000     0x2000
+ *(.text*)
+ .text.nfc_a    0x0000000008000000      0x100 build/f7-firmware-C/lib/libnfc.a(nfc.o)
+ .text.nfc_b    0x0000000008000100      0x200 build/f7-firmware-C/lib/libnfc.a(nfc_b.o)
+ .text.very_long_section_name_that_wraps
+                0x0000000008000300      0x40 /opt/toolchain/arm-none-eabi/lib/thumb/v7e-m+fp/hard/libc_nano.a(lib_a-strtod.o)
+ *fill*         0x0000000008000340        0x4
+ .text.main     0x0000000008000344       0x80 build/f7-firmware-C/applications/services/gui/gui.o
+.bss            0x0000000020000000      0x400
+ .bss.x         0x0000000020000000      0x400 build/f7-firmware-C/lib/libnfc.a(nfc.o)
+.data
+                0x0000000020000400       0x20 load address 0x00000000080003c4
+ .data.y        0x0000000020000400       0x20 build/f7-firmware-C/applications/services/gui/gui.o
+
+Cross Reference Table
+
+Symbol                                            File
+_strtod_l                                         /opt/x/libc_nano.a(lib_a-strtod.o)
+                                                  build/f7-firmware-C/lib/libnfc.a(nfc.o)
+"""
+
+
+class LinkMapTest(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location(
+            "linkmap", os.path.join(ROOT, "scripts", "linkmap.py")
+        )
+        self.linkmap = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.linkmap)
+
+    def test_groups(self):
+        sections = self.linkmap.parse_map(SAMPLE_MAP.splitlines(True))
+        groups, objects = self.linkmap.summarize(sections)
+        self.assertEqual(groups["libnfc.a"], 0x300)
+        self.assertEqual(groups["libc_nano.a"], 0x40)
+        self.assertEqual(groups["(padding)"], 4)
+        # the loose object's .text and the load copy of its .data
+        self.assertEqual(groups["applications/services"], 0x80 + 0x20)
+        self.assertNotIn("(toolchain)", "".join(groups))
+        self.assertEqual(objects["libnfc.a:nfc_b.o"], 0x200)
+
+    def test_bss_is_not_flash(self):
+        sections = self.linkmap.parse_map(SAMPLE_MAP.splitlines(True))
+        self.assertFalse([s for s in sections if s["section"] == ".bss.x"])
+
+    def test_cref(self):
+        cref = self.linkmap.parse_cref(SAMPLE_MAP.splitlines(True))
+        defined, users = cref["_strtod_l"]
+        self.assertIn("libc_nano.a", defined)
+        self.assertEqual(len(users), 1)
+
+    def test_report_with_map_and_baseline(self):
+        lines = SAMPLE_MAP.splitlines(True)
+        base = {"target": "f7", "image_size": 0, "free_flash": 0, "free_pages": 0, "data": 0, "bss": 0,
+                "sections": [], "symbols": {}}
+        size_report.add_map(base, lines[:9])  # without gui.o
+        now = dict(base)
+        size_report.add_map(now, lines)
+        self.assertEqual(now["flash_groups"]["libnfc.a"], 0x300)
+        delta = size_report.compare(now, base)
+        self.assertTrue(delta["has_group_baseline"])
+        self.assertEqual(delta["flash_groups"]["applications/services"], 0xA0)
+        md = size_report.render_markdown(now, delta, [], "x", {})
+        self.assertIn("Flash by library or directory", md)
+        self.assertIn("`libnfc.a`", md)
+        self.assertIn("+160", md)
+        # a baseline from before the map existed gives "n/a", not a huge change
+        old = {k: v for k, v in base.items() if k != "flash_groups"}
+        md = size_report.render_markdown(now, size_report.compare(now, old), [], "x", {})
+        self.assertNotIn("+768", md)
+
+
 if __name__ == "__main__":
     unittest.main()
