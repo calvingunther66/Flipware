@@ -143,10 +143,16 @@ static void subghz_scene_add_to_history_callback(
         preset.longitude = 0;
     }
 
-    if(subghz->last_settings->delete_old_signals && subghz_history_full(subghz->history)) {
+    // Free old captures while there is less than this much heap: a capture
+    // needs a few KB for its history item and the menu, and the history's own
+    // "full" limit (4 KB) left too little, so the app ran out of memory.
+    const size_t delete_old_headroom = 8 * 1024;
+    if(subghz->last_settings->delete_old_signals &&
+       (subghz_history_full(subghz->history) || memmgr_get_free_heap() < delete_old_headroom)) {
         subghz_view_receiver_disable_draw_callback(subghz->subghz_receiver);
 
-        while(idx > 0 && subghz_history_full(subghz->history)) {
+        while(idx > 0 && (subghz_history_full(subghz->history) ||
+                          memmgr_get_free_heap() < delete_old_headroom)) {
             subghz_history_delete_item(subghz->history, 0);
             subghz_view_receiver_delete_item(subghz->subghz_receiver, 0);
             idx--;
